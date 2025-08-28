@@ -1,0 +1,9 @@
+[package]
+name = "haviliar-IoT"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+esp-idf-hal = "0.45.2"
+esp-idf-svc = "0.51.0"
+esp-idf-sys = "0.36.1"
