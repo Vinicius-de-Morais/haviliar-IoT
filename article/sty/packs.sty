@@ -1,0 +1,201 @@
+% ---
+% PACOTES
+% ---
+
+% ---
+% Pacotes fundamentais 
+% ---
+\usepackage{lmodern}			% Usa a fonte Latin Modern
+\usepackage[T1]{fontenc}		% Selecao de codigos de fonte.
+\usepackage[utf8]{inputenc}		% Codificacao do documento (conversão automática dos acentos)
+\usepackage{indentfirst}		% Indenta o primeiro parágrafo de cada seção.
+\usepackage{nomencl} 			% Lista de simbolos
+\usepackage{color}				% Controle das cores
+\usepackage{graphicx}			% Inclusão de gráficos
+\usepackage{microtype} 			% para melhorias de justificação
+\usepackage{tikz}               % para inclusão de figuras complexas e desenho do layout da página
+% ---
+
+% ---
+% Pacotes adicionais, usados apenas no âmbito do Modelo Canônico do abnteX2
+% ---
+\usepackage{lipsum}				% para geração de dummy text
+% ---
+
+% ---
+% Pacotes de citações
+% ---
+\usepackage[brazilian,hyperpageref]{backref}	 % Paginas com as citações na bibl
+\usepackage[alf]{abntex2cite}	% Citações padrão ABNT
+% ---
+
+% ---
+% Configurações do pacote backref
+% Usado sem a opção hyperpageref de backref
+\renewcommand{\backrefpagesname}{Citado na(s) página(s):~}
+% Texto padrão antes do número das páginas
+\renewcommand{\backref}{}
+% Define os textos da citação
+\renewcommand*{\backrefalt}[4]{
+    \ifcase #1 %
+    Nenhuma citação no texto.%
+    \or
+    Citado na página #2.%
+    \else
+    Citado #1 vezes nas páginas #2.%
+    \fi}%
+% ---
+% ---
+% Configurações de aparência do PDF final
+
+% alterando o aspecto da cor azul
+\definecolor{blue}{RGB}{41,5,195}
+
+% informações do PDF
+\makeatletter
+\hypersetup{
+    %pagebackref=true,
+    pdftitle={\@title}, 
+  % pdfauthor={\@author},
+    pdfsubject={Revista e-Tec de Ciência e Tecnologia},
+   % pdfcreator={LaTeX with abnTeX2},
+    pdfkeywords={Engenharia}{informação}{lógica}{tecnologia}{artigo científico}, 
+    colorlinks=true,       		% false: boxed links; true: colored links
+    linkcolor=blue,          	% color of internal links
+    citecolor=blue,        		% color of links to bibliography
+    filecolor=magenta,      		% color of file links
+    urlcolor=blue,
+    bookmarksdepth=4
+}
+\makeatother
+% --- 
+
+% ---
+% compila o indice
+% ---
+\makeindex
+% ---
+
+% ---
+% Altera as margens padrões
+\setlength{\columnsep}{5mm}
+\setlrmarginsandblock{2cm}{2cm}{*}
+\setulmarginsandblock{2cm}{3cm}{*}
+\checkandfixthelayout
+% ---
+
+% ---
+% Altera a unidade de medida padrão para 1mm
+\setlength{\unitlength}{1mm}
+% ---
+% --- 
+% Espaçamentos entre linhas e parágrafos 
+% --- 
+
+% O tamanho do parágrafo é dado por:
+\setlength{\parindent}{1.0cm}
+
+% Controle do espaçamento entre um parágrafo e outro:
+\setlength{\parskip}{0.1cm}  % tente também \onelineskip
+
+% Espaçamento simples
+\SingleSpacing
+
+% Cabeçalho e rodapés personalizados
+\makepagestyle{rtai}
+%\makeheadrule{rtai}{\textwidth}{\normalrulethickness} %linha
+\makefootrule{rtai}{\textwidth}{\normalrulethickness}{\footruleskip}
+
+
+
+%%cabeçalhos
+\makeevenhead{rtai} %%pagina par
+{\begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,inner sep=0pt] at (current page.north west)
+    {\includegraphics[]{img/Imagem_lateral.jpg}};
+    \node[anchor=north east,inner sep=0pt] at (current page.north east)
+    {\includegraphics[]{img/cabecalho_template.png}};
+    \end{tikzpicture}
+}
+{}
+{}
+
+
+\makeoddhead{rtai} %%pagina ímpar ou com oneside trocar east por west
+{}
+{}
+{\begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,inner sep=0pt] at (current page.north west)
+    {\includegraphics[]{img/Imagem_lateral.jpg}};
+        \node[anchor=north east,inner sep=0pt] at (current page.north east)
+    {\includegraphics[]{img/cabecalho_template.png}};
+    \end{tikzpicture}
+}
+%\makeheadrule{rtai}{\textwidth}{\normalrulethickness} %linha
+
+%% rodapé
+\makeevenfoot{rtai}
+{\sffamily \small \thepage} %%pagina par
+{}
+{\sffamily \small UniSenai/PR Unidade Dr. Celso Charuri - Travessa João Alberto, 90, Bancários - Londrina/PR | 86062-070}
+
+\makeoddfoot{rtai} %%pagina ímpar ou com oneside
+{\sffamily \small UniSenai/PR Unidade Dr. Celso Charuri - Travessa João Alberto, 90, Bancários - Londrina/PR | 86062-070}
+{}
+{\sffamily \small \thepage}
+
+
+\makepagestyle{rtai-pre}
+%%cabeçalhos
+\makeevenhead{rtai-pre} %%pagina par
+{\begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,inner sep=0pt] at (current page.north west)
+    {\includegraphics[]{img/Imagem_lateral.jpg}};
+    \end{tikzpicture}
+}
+{}
+{}
+
+\makeoddhead{rtai-pre} %%pagina ímpar ou com oneside
+{}
+{}
+{\begin{tikzpicture}[remember picture,overlay]
+   \node[anchor=north east,inner sep=00pt] at (current page.north east)
+    {\includegraphics[]{img/Imagem_lateral.jpg}};
+    \end{tikzpicture}
+}
+
+%% rodapé
+\makeevenfoot{rtai-pre}
+{\sffamily \small \thepage} %%pagina par
+{}
+{\sffamily \small \imprimirtitulo}
+
+\makeoddfoot{rtai-pre} %%pagina ímpar ou com oneside
+{\sffamily \small \imprimirautor}
+{}
+{\sffamily \small \thepage}
+
+\aliaspagestyle{title}{rtai}
+
+%----------------------------------------------------------------------
+%% Substitui os comandos \pretextual, \textual e \postextual
+%----------------------------------------------------------------------
+\let\oldpretextual\pretextual
+\renewcommand{\pretextual}{%
+    \oldpretextual%
+    \pagestyle{rtai-pre}%
+}
+
+\let\oldtextual\textual
+\renewcommand{\textual}{%
+    \oldtextual%
+    \pagestyle{rtai}%
+}
+
+
+\let\oldpostextual\postextual
+\renewcommand{\postextual}{%
+    \oldpostextual%
+    \pagestyle{rtai}%
+}
