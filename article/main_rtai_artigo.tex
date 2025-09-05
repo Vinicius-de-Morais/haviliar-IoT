@@ -143,19 +143,15 @@ sumario=tradicional
     \section{Introdução}
     \addcontentsline{toc}{section}{Introdução}
     
-    Este documento e seu código-fonte são exemplos de referência de uso da classe \textsf{abntex2} e do pacote \textsf{abntex2cite}. O documento exemplifica a elaboração de publicação periódica científica impressa produzida conforme a ABNT NBR 6022:2003 \emph{Informação e documentação - Artigo em publicação periódica científica impressa - Apresentação}.
-    
-    A expressão ``Modelo canônico'' é utilizada para indicar que \abnTeX\ não é modelo específico de nenhuma universidade ou instituição, mas que implementa tão somente os requisitos das normas da ABNT. Uma lista completa das normas observadas pelo \abnTeX\ é apresentada em \citeonline{abntex2classe}.
-    
-    Sinta-se convidado a participar do projeto \abnTeX! Acesse o site do projeto em \url{http://www.abntex.net.br/}. Também fique livre para conhecer, estudar, alterar e redistribuir o trabalho do \abnTeX, desde que os arquivos modificados tenham seus nomes alterados e que os créditos sejam dados aos autores originais, nos termos da ``The \LaTeX\ Project Public License''\footnote{\url{http://www.latex-project.org/lppl.txt}}.
-    
-    Encorajamos que sejam realizadas customizações específicas deste documento. Porém, recomendamos que ao invés de se alterar diretamente os arquivos do \abnTeX, distribua-se arquivos com as respectivas customizações. Isso permite que futuras versões do \abnTeX~não se tornem automaticamente incompatíveis com as customizações promovidas. Consulte \citeonline{abntex2-wiki-como-customizar} par mais informações.
-    
-    Este exemplo deve ser utilizado como complemento do manual da classe \textsf{abntex2} \cite{abntex2classe}, dos manuais do pacote \textsf{abntex2cite} \cite{abntex2cite,abntex2cite-alf} e do manual da classe \textsf{memoir} \cite{memoir}. Consulte o \citeonline{abntex2modelo} para obter exemplos e informações adicionais de uso de \abnTeX\ e de \LaTeX.
+    No contexto te Smart Cities e Smart Farms, a Internet das Coisas (IoT) tem se destacado como uma tecnologia transformadora, permitindo a interconexão de dispositivos e sistemas para otimizar processos e melhorar a eficiência. A adoção de protocolos de comunicação eficientes é crucial para o sucesso dessas aplicações, especialmente em ambientes com conectividade limitada. Neste cenário, o protocolo LoRa (Long Range) tem emergido como uma solução promissora devido à sua capacidade de comunicação de longo alcance com baixo consumo de energia \cite{Yoon2020}.
 
-A introdução deve apresentar uma visão geral do artigo, delimitando o tema e o problema a ser abordado, bem como o (s) objetivo (s) e a justificativa. O intuito é chamar a atenção do leitor para o assunto que será apresentado no artigo, sem aprofundar conceitos ou antecipar resultados. 
+    Para maior versatilidade na transmissão de dados, a adoção de um gateway LoRa-MQTT (Message Queuing Telemetry Transport) tem se mostrado eficaz. O gateway atua como um intermediário entre os dispositivos LoRa e a nuvem, facilitando a transmissão de dados de sensores e atuadores para plataformas de análise e monitoramento em tempo real \cite{Bhawiyuga2019}.
+    
+    A existência de edifcios pode atrapalhar a comunicação LoRa, assim como ressalta \cite{lima2023}. Contudo esse efeito pode ser minimizado com o uso de antenas de maior ganho e posicionamento estratégico dos dispositivos.
+    
+    A proposta deste artigo é desenvolver um sistema de controle remoto de cancelas de estacionamento utilizando a tecnologia LoRa e o protocolo MQTT. O sistema visa permitir o controle eficiente e seguro das cancelas a partir de qualquer local com acesso à internet, proporcionando uma solução prática para gerenciamento de acesso em estacionamentos.  
 
-O corpo do texto, salvo exceções que serão mencionadas no decorrer do documento, devem ser grafados em fonte tamanho 12 pts, tipo Arial, espaçamento entre linhas de 1,5 com 0 pts. antes e 0 pts. depois. O alinhamento do texto deve ser “justificado”, e as margens devem figurar -  3 cm para margem superior e esquerda; e 2 cm para margem inferior e direita. O parágrafo (recuo esquerdo) deve ser de 1,25 cm. No artigo o texto deve ser apresentado sequencialmente, não ocorrendo quebra de página quando se inicia um novo capítulo e ou seção bem como seguir padrão adotado de espaçamento conforme apresenta-se a seguir: a) Entre o título e o início da seção, deve-se atribuir um espaço; b) Ao final de cada seção deve-se atribuir um espaço para iniciar um novo capítulo e ou seção ou subseção. 
+    % A introdução deve apresentar uma visão geral do artigo, delimitando o tema e o problema a ser abordado, bem como o (s) objetivo (s) e a justificativa. O intuito é chamar a atenção do leitor para o assunto que será apresentado no artigo, sem aprofundar conceitos ou antecipar resultados. 
 
     % ----------------------------------------------------------
     % Seção de explicações
