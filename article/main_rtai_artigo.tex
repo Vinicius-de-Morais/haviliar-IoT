@@ -90,72 +90,68 @@ sumario=tradicional
 % ----
 
     
-    % Seleciona o idioma do documento (conforme pacotes do babel)
-    %\selectlanguage{english}
-    \selectlanguage{brazil}
-    
-    % Retira espaço extra obsoleto entre as frases.
-    \frenchspacing 
-    
-    % ----------------------------------------------------------
-    % ELEMENTOS PRÉ-TEXTUAIS
-    % ----------------------------------------------------------
-    
-    %\twocolumn[    		% INICIO DE ARTIGO EM DUAS COLUNAS
-    
-    % página de titulo
-   % \maketitle
-    % resumo em português
-    \begin{resumo}
-        A Internet das Coisas (IoT) tem revolucionado a forma como dispositivos e sistemas são conectados, permitindo a criação de ambientes inteligentes e integrados, como as Smart Cities. Essas cidades inteligentes dependem da comunicação eficiente entre dispositivos distribuídos para otimizar recursos, melhorar a segurança e facilitar o controle remoto de infraestrutura crítica. No entanto, a conectividade remota de dispositivos físicos ainda enfrenta desafios significativos em regiões com infraestrutura de rede limitada, onde custos elevados e baixa acessibilidade dificultam a implementação de soluções eficientes. Tecnologias como LoRa, que oferecem comunicação de longo alcance com baixo consumo energético, surgem como alternativas viáveis para superar essas barreiras. Este trabalho apresenta uma solução baseada em LoRa e MQTT para o controle remoto de cancelas de estacionamento, utilizando módulos ESP32 com comunicação LoRa e um gateway que integra a rede local a um servidor MQTT. A arquitetura proposta permite que comandos sejam enviados e executados de qualquer lugar com acesso à internet, garantindo baixo custo, segurança e escalabilidade.
+% Seleciona o idioma do documento (conforme pacotes do babel)
+%\selectlanguage{english}
+\selectlanguage{brazil}
 
+% Retira espaço extra obsoleto entre as frases.
+\frenchspacing 
+
+% ----------------------------------------------------------
+% ELEMENTOS PRÉ-TEXTUAIS
+% ----------------------------------------------------------
+
+%\twocolumn[    		% INICIO DE ARTIGO EM DUAS COLUNAS
+% página de titulo
+% \maketitle
+% resumo em português
+\begin{resumo}
+    A Internet das Coisas (IoT) tem revolucionado a forma como dispositivos e sistemas são conectados, permitindo a criação de ambientes inteligentes e integrados, como as Cidades Inteligentes. Essas cidades dependem da comunicação eficiente entre dispositivos distribuídos para otimizar recursos, melhorar a segurança e facilitar o controle remoto de infraestrutura crítica. No entanto, a conectividade remota de dispositivos físicos ainda enfrenta desafios significativos em regiões com infraestrutura de rede limitada, onde custos elevados e baixa acessibilidade dificultam a implementação de soluções eficientes. Tecnologias como LoRa, que oferecem comunicação de longo alcance com baixo consumo energético, surgem como alternativas viáveis para superar essas barreiras. Este trabalho apresenta uma solução baseada em LoRa e MQTT para o controle remoto de cancelas de estacionamento, utilizando módulos ESP32 com comunicação LoRa e um gateway que integra a rede local a um servidor MQTT. A arquitetura proposta permite que comandos sejam enviados e executados de qualquer lugar com acesso à internet, garantindo baixo custo, segurança e escalabilidade.
+
+    \noindent
+    \textbf{Palavras-chave}: IoT. LoRa. Computação de Ponta. Cidades Inteligentes.
+\end{resumo}
+    
+% resumo em inglês
+\renewcommand{\resumoname}{Abstract}
+\begin{resumo}
+    \begin{otherlanguage*}{english}
+        The Internet of Things (IoT) has revolutionized the way devices and systems are connected, enabling the creation of intelligent and integrated environments such as Smart Cities. These cities rely on efficient communication between distributed devices to optimize resources, enhance security, and facilitate remote control of critical infrastructure. However, remote connectivity of physical devices still faces significant challenges in regions with limited network infrastructure, where high costs and low accessibility hinder the implementation of effective solutions. Technologies like LoRa, which offer long-range communication with low power consumption, emerge as viable alternatives to overcome these barriers. This work presents a solution based on LoRa and MQTT for remote control of parking lot gates, using ESP32 modules with LoRa communication and a gateway that connects the local network to an MQTT server. The proposed architecture enables commands to be sent and executed from anywhere with internet access, ensuring low cost, security, and scalability.
+        
         \noindent
-        
-        \textbf{Palavras-chave}: IoT. LoRa. Computação de Ponta. Cidades Inteligentes. Cidade Inteligente
-    \end{resumo}
-        
-    % resumo em inglês
-    \renewcommand{\resumoname}{Abstract}
-    \begin{resumo}
-        \begin{otherlanguage*}{english}
-            The Internet of Things (IoT) has revolutionized the way devices and systems are connected, enabling the creation of intelligent and integrated environments such as Smart Cities. These smart cities rely on efficient communication between distributed devices to optimize resources, enhance security, and facilitate remote control of critical infrastructure. However, remote connectivity of physical devices still faces significant challenges in regions with limited network infrastructure, where high costs and low accessibility hinder the implementation of effective solutions. Technologies like LoRa, which offer long-range communication with low power consumption, emerge as viable alternatives to overcome these barriers. This work presents a solution based on LoRa and MQTT for remote control of parking lot gates, using ESP32 modules with LoRa communication and a gateway that connects the local network to an MQTT server. The proposed architecture enables commands to be sent and executed from anywhere with internet access, ensuring low cost, security, and scalability.
-            
-            \noindent
-            \textbf{Keywords}: IoT. LoRa. Edge Computing. Smart Cities. Smart City
-        \end{otherlanguage*}  
-    \end{resumo}
-    
-    
-    \vspace{\onelineskip}%
-    
-  %  ]  				% FIM DE ARTIGO EM DUAS COLUNAS
-    % ---
-    
-    
-    % ----------------------------------------------------------
-    % ELEMENTOS TEXTUAIS
-    % ----------------------------------------------------------
-    \textual
-    
-    % ----------------------------------------------------------
-    % Introdução
-    % ----------------------------------------------------------
-    \section{Introdução}
-    \addcontentsline{toc}{section}{Introdução}
-    
-    No contexto te Smart Cities e Smart Farms, a Internet das Coisas (IoT) tem se destacado como uma tecnologia transformadora, permitindo a interconexão de dispositivos e sistemas para otimizar processos e melhorar a eficiência. A adoção de protocolos de comunicação eficientes é crucial para o sucesso dessas aplicações, especialmente em ambientes com conectividade limitada. Neste cenário, o protocolo LoRa (Long Range) tem emergido como uma solução promissora devido à sua capacidade de comunicação de longo alcance com baixo consumo de energia \cite{Yoon2020}.
+        \textbf{Keywords}: IoT. LoRa. Edge Computing. Smart Cities.
+    \end{otherlanguage*}  
+\end{resumo}
 
-    Para maior versatilidade na transmissão de dados, a adoção de um gateway LoRa-MQTT (Message Queuing Telemetry Transport) tem se mostrado eficaz. O gateway atua como um intermediário entre os dispositivos LoRa e a nuvem, facilitando a transmissão de dados de sensores e atuadores para plataformas de análise e monitoramento em tempo real \cite{Bhawiyuga2019}.
-    
-    A existência de edifcios pode atrapalhar a comunicação LoRa, assim como ressalta \cite{lima2023}. Contudo esse efeito pode ser minimizado com o uso de antenas de maior ganho e posicionamento estratégico dos dispositivos.
-    
-    A proposta deste artigo é desenvolver um sistema de controle remoto de cancelas de estacionamento utilizando a tecnologia LoRa e o protocolo MQTT. O sistema visa permitir o controle eficiente e seguro das cancelas a partir de qualquer local com acesso à internet, proporcionando uma solução prática para gerenciamento de acesso em estacionamentos.  
 
-    % A introdução deve apresentar uma visão geral do artigo, delimitando o tema e o problema a ser abordado, bem como o (s) objetivo (s) e a justificativa. O intuito é chamar a atenção do leitor para o assunto que será apresentado no artigo, sem aprofundar conceitos ou antecipar resultados. 
+\vspace{\onelineskip}%
 
-    % ----------------------------------------------------------
-    % Seção de explicações
-    % ----------------------------------------------------------
+% ----------------------------------------------------------
+% ELEMENTOS TEXTUAIS
+% ----------------------------------------------------------
+\textual
+
+% ----------------------------------------------------------
+% Introdução
+% ----------------------------------------------------------
+\section{Introdução}
+\addcontentsline{toc}{section}{Introdução}
+
+No contexto das Smart Cities, a Internet das Coisas (IoT) tem se destacado como uma tecnologia transformadora, permitindo a interconexão de dispositivos e sistemas para otimizar processos e melhorar a eficiência. A adoção de protocolos de comunicação eficientes é crucial para o sucesso dessas aplicações, especialmente em ambientes com conectividade limitada. Nesse cenário, o protocolo LoRa (Long Range) tem emergido como uma solução promissora devido à sua capacidade de comunicação de longo alcance com baixo consumo de energia \cite{Yoon2020}.
+
+Para maior versatilidade na transmissão de dados, a adoção de um gateway LoRa-MQTT (Message Queuing Telemetry Transport) tem se mostrado eficaz. O gateway atua como intermediário entre os dispositivos LoRa e a nuvem, facilitando a transmissão de dados de sensores e atuadores para plataformas de análise e monitoramento em tempo real \cite{Bhawiyuga2019}.
+
+A existência de edifícios pode interferir na comunicação LoRa, como ressalta \cite{lima2023}. Contudo, esse efeito pode ser minimizado com o uso de antenas de maior ganho e com o posicionamento estratégico dos dispositivos.
+
+Diante desse contexto, este artigo propõe o desenvolvimento de um sistema de controle remoto de cancelas de estacionamento utilizando a tecnologia LoRa e o protocolo MQTT. A solução visa permitir o gerenciamento eficiente e seguro das cancelas a partir de qualquer local com acesso à internet, oferecendo uma alternativa prática, de baixo custo e escalável para aplicações urbanas.
+
+O artigo está organizado da seguinte forma: a Seção 2 descreve os fundamentos teóricos, a Seção 3 apresenta a arquitetura proposta, a Seção 4 discute os resultados e, por fim, a Seção 5 apresenta as conclusões.
+
+% A introdução deve apresentar uma visão geral do artigo, delimitando o tema e o problema a ser abordado, bem como o (s) objetivo (s) e a justificativa. O intuito é chamar a atenção do leitor para o assunto que será apresentado no artigo, sem aprofundar conceitos ou antecipar resultados. 
+
+% ----------------------------------------------------------
+% Seção de explicações
+% ----------------------------------------------------------
 \section{Fundamentação teórica}
 
 Parte que embasa cientificamente o trabalho. Deve-se expor o assunto tratado de forma pormenorizada e ordenada, divide-se em seções e subseções de acordo com o tipo de trabalho. A seção Fundamentação teórica, assim como as demais seções e subseções devem ser separadas do texto que a antecede e que a precede por 1 (um) espaço de entrelinhas de 1,5 cm.
