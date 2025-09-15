@@ -1,70 +1,108 @@
-fn main() -> anyhow::Result<()> {
-    // --- Inicializa logger ---
+#![no_std]
+#![no_main]
+
+use anyhow::Result;
+use core::fmt::Write;
+use embedded_graphics::{
+    mono_font::{ascii::FONT_6X10, MonoTextStyle},
+    pixelcolor::BinaryColor,
+    prelude::*,
+    text::{Alignment, Text},
+};
+use esp_idf_hal::{
+    delay::FreeRtos,
+    gpio::PinDriver,
+    i2c::I2cDriver,
+    prelude::*,
+    units::Hertz,
+};
+use esp_idf_sys as _;
+use log::*;
+use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
+
+// Configurações do TTGO LoRa32
+const OLED_SDA: u8 = 4;
+const OLED_SCL: u8 = 15;
+const OLED_RST: u8 = 16;
+const I2C_ADDRESS: u8 = 0x3C;
+
+#[no_mangle]
+fn main() -> Result<()> {
+    // Setup do logger
+    esp_idf_sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
 
-    // --- Inicializa periféricos ---
+    info!("Inicializando...");
+
+    // Configuração dos periféricos
     let peripherals = Peripherals::take().unwrap();
 
-    // --- Conexão WiFi ---
-    let sysloop = EspSysLoopStack::new()?;
-    let mut wifi = EspWifi::new(peripherals.modem, sysloop.clone(), None)?;
-    wifi.set_configuration(&Configuration::Client(ClientConfiguration {
-        ssid: "MinhaRede".into(),
-        password: "MinhaSenha".into(),
-        ..Default::default()
-    }))?;
-    wifi.start()?;
-    wifi.connect()?;
-    wifi.wait_netif_up()?;
-    println!("✅ Conectado ao WiFi!");
+    // Configuração do pino de reset
+    let mut rst_pin = PinDriver::output(peripherals.pins.gpio16)?;
+    
+    // Reset manual do display
+    rst_pin.set_low()?;
+    FreeRtos::delay_ms(20);
+    rst_pin.set_high()?;
 
-    // --- Cliente MQTT ---
-    let mqtt_config = MqttClientConfiguration::default();
-    let mut mqtt_client = EspMqttClient::new(
-        "mqtt://test.mosquitto.org:1883",
-        &mqtt_config,
-        move |event| {
-            if let Event::Received(msg) = event {
-                if let Some(topic) = msg.topic() {
-                    println!("📩 MQTT recebeu no tópico {topic}: {:?}", msg.data());
+    // Configuração do I2C
+    let i2c = peripherals.i2c0;
+    let sda = peripherals.pins.gpio4;
+    let scl = peripherals.pins.gpio15;
 
-                    // 👉 Aqui você poderia repassar pro LoRa
-                    // lora.transmit(msg.data(), &mut delay).unwrap();
-                }
-            }
-        },
-    )?;
+    let config = esp_idf_hal::i2c::I2cConfig::new().baudrate(Hertz(400_000));
+    let i2c_driver = I2cDriver::new(i2c, sda, scl, &config)?;
 
-    mqtt_client.subscribe("esp32/lora/down", QoS::AtMostOnce)?;
+    // Interface do display
+    let interface = I2CDisplayInterface::new(i2c_driver);
+    let mut display = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0)
+        .into_buffered_graphics_mode();
+    
+    display.init().map_err(|_| anyhow::anyhow!("Falha ao inicializar OLED"))?;
+    info!("OLED inicializado com sucesso!");
 
-    // --- Inicializa LoRa (via SPI) ---
-    let spi = SpiDriver::new(
-        peripherals.spi2,
-        peripherals.pins.gpio18, // SCLK
-        peripherals.pins.gpio23, // MOSI
-        peripherals.pins.gpio19, // MISO
-        &SpiConfig::new(),
-    )?;
-    let nss = PinDriver::output(peripherals.pins.gpio5)?;
-    let reset = PinDriver::output(peripherals.pins.gpio14)?;
-    let dio0 = PinDriver::input(peripherals.pins.gpio26)?;
-    let mut delay = Ets;
-    let mut lora = LoRa::new(spi, nss, reset, dio0, 915, &mut delay)?;
-    println!("✅ LoRa inicializado!");
+    // Limpa o display
+    display.clear(BinaryColor::Off).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    display.flush().map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
-    // --- Loop principal ---
+    // Texto inicial
+    let text_style = MonoTextStyle::new(&FONT_6X10, BinaryColor::On);
+    
+    Text::with_alignment(
+        "TTGO LoRa",
+        display.bounding_box().center() + Point::new(0, -10),
+        text_style,
+        Alignment::Center,
+    )
+    .draw(&mut display).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    
+    display.flush().map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    FreeRtos::delay_ms(2000);
+
+    // Loop principal
+    let mut counter = 0;
     loop {
-        // Recebe do LoRa e publica no MQTT
-        if let Ok(packet) = lora.receive(&mut delay) {
-            println!("📡 LoRa recebeu: {:?}", packet);
-            mqtt_client.publish(
-                "esp32/lora/up",
-                QoS::AtMostOnce,
-                false,
-                &packet.payload,
-            )?;
-        }
+    display.clear(BinaryColor::Off).map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
-        std::thread::sleep(std::time::Duration::from_millis(200));
+        // Texto estático
+        Text::new("Display OK!", Point::new(0, 10), text_style)
+            .draw(&mut display).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        
+        Text::new("Contador:", Point::new(0, 25), text_style)
+            .draw(&mut display).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
+        // Contador
+        let mut counter_str = heapless::String::<10>::new();
+    write!(&mut counter_str, "{}", counter).unwrap();
+        
+        Text::new(&counter_str, Point::new(0, 40), text_style)
+            .draw(&mut display).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
+    display.flush().map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        
+        info!("Contador: {}", counter);
+        counter += 1;
+        
+        FreeRtos::delay_ms(1000);
     }
 }
