@@ -67,9 +67,7 @@ impl Display {
     pub fn text_clear(&mut self, message: &str, x: i32, y: i32){
         self.clear();
 
-        let text_style = MonoTextStyle::new(&FONT_6X10, BinaryColor::On);
-        
-        let _ = Text::new(message, Point::new(x, y), text_style)
+        let _ = Text::new(message, Point::new(x, y), self.text_style)
             .draw(&mut self.display).map_err(|e| anyhow::anyhow!("{:?}", e));
 
         self.display.flush().unwrap();
