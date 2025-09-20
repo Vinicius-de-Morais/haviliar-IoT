@@ -1,19 +1,13 @@
 use anyhow::Result;
-use core::fmt::Write;
 use embedded_graphics::{
     mono_font::{ascii::FONT_6X10, MonoTextStyle},
     pixelcolor::BinaryColor,
     prelude::*,
     text::{Alignment, Text},
 };
-use esp_idf_hal::{
-    i2c::{I2cConfig, I2cDriver}, // Import I2cConfig directly
-    prelude::*,
-    units::Hertz,
-};
+use esp_idf_hal::i2c::I2cDriver;
 use esp_idf_sys as _;
 use log::*;
-// Import the specific types needed for the struct definition
 use ssd1306::{mode::BufferedGraphicsMode, prelude::*, I2CDisplayInterface, Ssd1306};
 
 pub struct Display {
