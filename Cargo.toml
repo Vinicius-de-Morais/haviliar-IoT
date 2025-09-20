@@ -1,13 +1,19 @@
 [package]
-name = "testando"
+name = "haviliar-iot"
 version = "0.1.0"
 authors = ["Vinicius-de-Morais <vmorais194@gmail.com>"]
 edition = "2021"
 resolver = "2"
 rust-version = "1.77"
 
+[workspace]
+members = [
+    ".",
+    "hal"
+]
+
 [[bin]]
-name = "testando"
+name = "haviliar-iot"
 harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
 
 [profile.release]
@@ -23,6 +29,7 @@ default = []
 experimental = ["esp-idf-svc/experimental"]
 
 [dependencies]
+hal = { path = "hal" }
 log = "0.4"
 esp-idf-svc = "0.51"
 esp-idf-sys = { version = "0.36.1", features = ["binstart"] }

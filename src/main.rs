@@ -82,7 +82,7 @@ fn main() -> Result<()> {
     // Loop principal
     let mut counter = 0;
     loop {
-    display.clear(BinaryColor::Off).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        display.clear(BinaryColor::Off).map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
         // Texto estático
         Text::new("Display OK!", Point::new(0, 10), text_style)
@@ -93,12 +93,15 @@ fn main() -> Result<()> {
 
         // Contador
         let mut counter_str = heapless::String::<10>::new();
-    write!(&mut counter_str, "{}", counter).unwrap();
+        write!(&mut counter_str, "{}", counter).unwrap();
         
         Text::new(&counter_str, Point::new(0, 40), text_style)
             .draw(&mut display).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        
+        Text::new("Adicionei uma nova MSG", Point::new(0, 55), text_style)
+            .draw(&mut display).map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
-    display.flush().map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        display.flush().map_err(|e| anyhow::anyhow!("{:?}", e))?;
         
         info!("Contador: {}", counter);
         counter += 1;
