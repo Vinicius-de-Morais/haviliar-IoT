@@ -36,7 +36,7 @@ esp-idf-sys = { version = "0.36.1", features = ["binstart"] }
 esp-idf-hal = "0.45.2"
 embedded-graphics = "0.8.1"
 ssd1306 = { version = "0.10", features = ["graphics"] }
-anyhow = "1.0"
+anyhow = "1.0.99"
 embedded-hal = "1.0.0"
 heapless = "0.9.1"
 
@@ -59,3 +59,11 @@ heapless = "0.9.1"
 
 [build-dependencies]
 embuild = "0.33"
+
+
+[build]
+target = "xtensa-esp32-espidf"
+
+[target.xtensa-esp32-espidf]
+linker = "ldproxy"
+runner = "espflash flash --monitor"

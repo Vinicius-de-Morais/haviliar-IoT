@@ -1,0 +1,13 @@
+# .mise.toml
+
+[tools]
+#rust = "esp"
+
+python = "3.12"
+
+# -----------------------------------------------------------------------------
+
+[env]
+PATH = "$HOME/.rustup/toolchains/esp/bin:$HOME/.rustup/toolchains/esp/xtensa-esp32-elf-clang/esp-19.1.2_20250225/bin:$HOME/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/bin:$PATH"
+LIBCLANG_PATH = "$HOME/.rustup/toolchains/esp/xtensa-esp32-elf-clang/esp-19.1.2_20250225/lib"
+RUSTUP_TOOLCHAIN="esp"
