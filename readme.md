@@ -173,6 +173,29 @@ make monitor PORT=/dev/ttyUSB0
 
 ---
 
+## Dicas:
+
+### Rodando no WSL
+
+**Adicionar Device**
+
+Rodar esse comando para vericar o BUSID
+
+```bash
+usbipd list
+
+====Output====
+
+BUSID  VID:PID    DEVICE                                                        STATE
+2-2    10c4:ea60  Silicon Labs CP210x USB to UART Bridge (COM7)                 Shared
+```
+
+Depois adicionar o dispositivo no WSL
+
+```bash
+usbipd attach --wsl --busid [BUSID]
+```
+
 ## 🐛 Problemas comuns
 
 ### Erro: `libxml2.so.2 not found`

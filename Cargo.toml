@@ -1,13 +1,19 @@
 [package]
-name = "testando"
+name = "haviliar-iot"
 version = "0.1.0"
 authors = ["Vinicius-de-Morais <vmorais194@gmail.com>"]
 edition = "2021"
 resolver = "2"
 rust-version = "1.77"
 
+[workspace]
+members = [
+    ".",
+    "hal"
+]
+
 [[bin]]
-name = "testando"
+name = "haviliar-iot"
 harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
 
 [profile.release]
@@ -23,15 +29,18 @@ default = []
 experimental = ["esp-idf-svc/experimental"]
 
 [dependencies]
+hal = { path = "hal" }
 log = "0.4"
 esp-idf-svc = "0.51"
 esp-idf-sys = { version = "0.36.1", features = ["binstart"] }
 esp-idf-hal = "0.45.2"
 embedded-graphics = "0.8.1"
 ssd1306 = { version = "0.10", features = ["graphics"] }
-anyhow = "1.0"
+anyhow = "1.0.99"
 embedded-hal = "1.0.0"
 heapless = "0.9.1"
+#lora-phy = { version = "3.0.1", features = ["sx127x", "lora"] }
+lora-phy = { version = "3.0.1", features = ["sx127x", "lora"] }
 
 # --- Optional Embassy Integration ---
 # esp-idf-svc = { version = "0.51", features = ["critical-section", "embassy-time-driver", "embassy-sync"] }
@@ -52,3 +61,11 @@ heapless = "0.9.1"
 
 [build-dependencies]
 embuild = "0.33"
+
+
+[build]
+target = "xtensa-esp32-espidf"
+
+[target.xtensa-esp32-espidf]
+linker = "ldproxy"
+runner = "espflash flash --monitor"

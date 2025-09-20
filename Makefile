@@ -16,6 +16,7 @@ OS := $(shell uname -s)
 # Binários
 CARGO = cargo
 ESPFLASH = espflash
+ESP_ENV = source ~/export-esp.sh
 
 # ========================
 # Comandos principais
@@ -24,17 +25,17 @@ ESPFLASH = espflash
 # Build
 build:
 	@echo "==> Compilando para ESP32"
-	$(CARGO) build --release --target $(TARGET)
+	$(ESP_ENV) && $(CARGO) build --release --target $(TARGET)
 
 # Build + Run (simula no host ou executa diretamente no ESP32, dependendo do target)
 run:
 	@echo "==> Build + Run"
-	$(CARGO) run --target $(TARGET)
+	$(ESP_ENV) && $(CARGO) run --target $(TARGET)
 
 # Flash
 flash:
 	@echo "==> Gravando firmware na placa"
-	$(ESPFLASH) flash --monitor --baud 115200 $(PORT) target/$(TARGET)/release/$(shell basename $(CURDIR))
+	$(ESP_ENV) && $(ESPFLASH) flash --monitor --baud 115200 $(PORT) target/$(TARGET)/release/$(shell basename $(CURDIR))
 
 # Monitor serial
 monitor:
@@ -52,8 +53,10 @@ clean:
 
 setup-linux:
 	@echo "==> Instalando ferramentas necessárias no Linux"
+	sudo pacman -S cmake ninja gcc git pkg-config llvm clang
 	cargo install espup --locked
-	cargo install cargo-generate
+	espup install
+	. /home/winux/export-esp.sh
 	@echo "==> Criando link simbólico para corrigir libxml2 (Arch Linux)"
 	sudo ln -sf /usr/lib/libxml2.so.16 /usr/lib/libxml2.so.2
 	@echo "==> Adicionando permissão de usuário para acessar porta serial"
