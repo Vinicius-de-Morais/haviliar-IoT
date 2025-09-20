@@ -19,6 +19,7 @@ use esp_idf_hal::{
 use esp_idf_sys as _;
 use log::*;
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
+use hal::display::Display;
 
 // Configurações do TTGO LoRa32
 const OLED_SDA: u8 = 4;
@@ -45,64 +46,59 @@ fn main() -> Result<()> {
     FreeRtos::delay_ms(20);
     rst_pin.set_high()?;
 
+    
     // Configuração do I2C
     let i2c = peripherals.i2c0;
     let sda = peripherals.pins.gpio4;
     let scl = peripherals.pins.gpio15;
-
+    
     let config = esp_idf_hal::i2c::I2cConfig::new().baudrate(Hertz(400_000));
     let i2c_driver = I2cDriver::new(i2c, sda, scl, &config)?;
+    let mut display = Display::new(i2c_driver).unwrap();
 
-    // Interface do display
-    let interface = I2CDisplayInterface::new(i2c_driver);
-    let mut display = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0)
-        .into_buffered_graphics_mode();
+    // // Interface do display
+    // let interface = I2CDisplayInterface::new(i2c_driver);
+    // let mut display = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0)
+    //     .into_buffered_graphics_mode();
     
-    display.init().map_err(|_| anyhow::anyhow!("Falha ao inicializar OLED"))?;
-    info!("OLED inicializado com sucesso!");
+    // display.init().map_err(|_| anyhow::anyhow!("Falha ao inicializar OLED"))?;
+    // info!("OLED inicializado com sucesso!");
 
-    // Limpa o display
-    display.clear(BinaryColor::Off).map_err(|e| anyhow::anyhow!("{:?}", e))?;
-    display.flush().map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    // // Limpa o display
+    // display.clear(BinaryColor::Off).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    // display.flush().map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
-    // Texto inicial
-    let text_style = MonoTextStyle::new(&FONT_6X10, BinaryColor::On);
+    // // Texto inicial
+    // let text_style = MonoTextStyle::new(&FONT_6X10, BinaryColor::On);
     
-    Text::with_alignment(
-        "TTGO LoRa",
-        display.bounding_box().center() + Point::new(0, -10),
-        text_style,
-        Alignment::Center,
-    )
-    .draw(&mut display).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    // Text::with_alignment(
+    //     "TTGO LoRa",
+    //     display.bounding_box().center() + Point::new(0, -10),
+    //     text_style,
+    //     Alignment::Center,
+    // )
+    // .draw(&mut display).map_err(|e| anyhow::anyhow!("{:?}", e))?;
     
-    display.flush().map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    // display.flush().map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    display.show_message("Iniciando");
     FreeRtos::delay_ms(2000);
 
     // Loop principal
     let mut counter = 0;
     loop {
-        display.clear(BinaryColor::Off).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        display.clear();
 
-        // Texto estático
-        Text::new("Display OK!", Point::new(0, 10), text_style)
-            .draw(&mut display).map_err(|e| anyhow::anyhow!("{:?}", e))?;
-        
-        Text::new("Contador:", Point::new(0, 25), text_style)
-            .draw(&mut display).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        // // Texto estático
+        display.text_new_line("Display OK!", 1);
+        display.text_new_line("Contador:", 2);    
 
-        // Contador
+        // // Contador
         let mut counter_str = heapless::String::<10>::new();
         write!(&mut counter_str, "{}", counter).unwrap();
         
-        Text::new(&counter_str, Point::new(0, 40), text_style)
-            .draw(&mut display).map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        display.text_new_line(&counter_str, 3);
         
-        Text::new("Adicionei uma nova MSG", Point::new(0, 55), text_style)
-            .draw(&mut display).map_err(|e| anyhow::anyhow!("{:?}", e))?;
-
-        display.flush().map_err(|e| anyhow::anyhow!("{:?}", e))?;
-        
+        display.flush();        
         info!("Contador: {}", counter);
         counter += 1;
         
