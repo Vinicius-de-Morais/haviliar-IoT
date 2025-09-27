@@ -56,30 +56,6 @@ fn main() -> Result<()> {
     let i2c_driver = I2cDriver::new(i2c, sda, scl, &config)?;
     let mut display = Display::new(i2c_driver).unwrap();
 
-    // // Interface do display
-    // let interface = I2CDisplayInterface::new(i2c_driver);
-    // let mut display = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0)
-    //     .into_buffered_graphics_mode();
-    
-    // display.init().map_err(|_| anyhow::anyhow!("Falha ao inicializar OLED"))?;
-    // info!("OLED inicializado com sucesso!");
-
-    // // Limpa o display
-    // display.clear(BinaryColor::Off).map_err(|e| anyhow::anyhow!("{:?}", e))?;
-    // display.flush().map_err(|e| anyhow::anyhow!("{:?}", e))?;
-
-    // // Texto inicial
-    // let text_style = MonoTextStyle::new(&FONT_6X10, BinaryColor::On);
-    
-    // Text::with_alignment(
-    //     "TTGO LoRa",
-    //     display.bounding_box().center() + Point::new(0, -10),
-    //     text_style,
-    //     Alignment::Center,
-    // )
-    // .draw(&mut display).map_err(|e| anyhow::anyhow!("{:?}", e))?;
-    
-    // display.flush().map_err(|e| anyhow::anyhow!("{:?}", e))?;
     display.show_message("Iniciando");
     FreeRtos::delay_ms(2000);
 

@@ -8,14 +8,18 @@ path = "src/lib.rs"
 
 [dependencies]
 log = "0.4"
-esp-idf-svc = "0.51"
+esp-idf-svc ={ version = "0.51" }
 esp-idf-sys = { version = "0.36.1", features = ["binstart"] }
-esp-idf-hal = "0.45.2"
+esp-idf-hal = { version ="0.45.2" }
 embedded-graphics = "0.8.1"
 ssd1306 = { version = "0.10", features = ["graphics"] }
 anyhow = "1.0"
 embedded-hal = "1.0.0"
+embedded-hal-async = "1.0.0"
 heapless = "0.9.1"
+lora-phy = { version = "3.0.1" }
+embassy-time = "0.5.0"
+
 
 [build-dependencies]
 embuild = "0.33"
