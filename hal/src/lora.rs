@@ -27,7 +27,7 @@ type LoRaType<'d, T> = LoRa<Sx127x<SpiDriverType<'d, T>, GenericInterface<'d>, S
 pub struct Lora<'d, T>
 where
     T: Borrow<hal_SpiDriver<'d>> + 'd,
-    SpiDeviceDriver<'d, T>: embedded_hal_async::spi::SpiDevice,
+    for<'a> &'a mut SpiDeviceDriver<'d, T>: embedded_hal_async::spi::SpiDevice,
 {
     driver: LoRaType<'d, T>,
     modulation: ModulationParams,
@@ -38,7 +38,7 @@ where
 impl<'d, T> Lora<'d, T>
 where
     T: Borrow<hal_SpiDriver<'d>> + 'd,
-    SpiDeviceDriver<'d, T>: embedded_hal_async::spi::SpiDevice,
+    for<'a> &'a mut SpiDeviceDriver<'d, T>: embedded_hal_async::spi::SpiDevice,
 {
     pub async fn new(
         spi: &'d mut SpiDeviceDriver<'d, T>,

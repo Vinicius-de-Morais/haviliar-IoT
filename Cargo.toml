@@ -9,7 +9,8 @@ rust-version = "1.77"
 [workspace]
 members = [
     ".",
-    "hal"
+    "hal",
+    "factory"
 ]
 
 [[bin]]
@@ -30,6 +31,7 @@ experimental = ["esp-idf-svc/experimental"]
 
 [dependencies]
 hal = { path = "hal" }
+factory = { path = "factory" }
 log = "0.4"
 esp-idf-svc = "0.51"
 esp-idf-sys = { version = "0.36.1", features = ["binstart"] }

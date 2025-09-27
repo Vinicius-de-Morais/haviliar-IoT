@@ -692,6 +692,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "factory"
+version = "0.1.0"
+dependencies = [
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+ "esp-idf-hal",
+ "hal",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -867,6 +877,7 @@ dependencies = [
  "esp-idf-hal",
  "esp-idf-svc",
  "esp-idf-sys",
+ "factory",
  "hal",
  "heapless 0.9.1",
  "log",
