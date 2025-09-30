@@ -1,8 +1,9 @@
-use std::borrow::Borrow;
-use std::fmt::{self, Debug, Display};
+use core::borrow::Borrow;
+use core::fmt::{self, Debug, Display};
 use embedded_hal_async::spi::{ErrorType, SpiDevice, Operation};
 use esp_idf_hal::spi::{SpiDeviceDriver, SpiDriver};
 use esp_idf_hal::io::EspIOError;
+use heapless::Vec;
 
 // Custom error type that implements embedded_hal::spi::Error
 #[derive(Debug)]
@@ -20,7 +21,7 @@ impl Display for SpiAdapterError {
     }
 }
 
-impl std::error::Error for SpiAdapterError {}
+impl core::error::Error for SpiAdapterError {}
 
 // Implement the embedded_hal::spi::Error trait
 impl embedded_hal::spi::Error for SpiAdapterError {
@@ -76,7 +77,8 @@ where
                     // For transfer, we need to read and write the same amount of data
                     if read.len() == write.len() {
                         // Create a temporary buffer to hold the write data
-                        let mut write_data = write.iter().copied().collect::<Vec<u8>>();
+                        let mut write_data = write.iter().copied()
+                            .collect::<Vec<u8, 256>>();
 
                         self.driver.transfer(&mut write_data, read)
                             .map_err(|e| SpiAdapterError::IoError(EspIOError(e)))?;

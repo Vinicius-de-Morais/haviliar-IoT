@@ -1,7 +1,6 @@
-use std::borrow::Borrow;
+use core::borrow::Borrow;
 use anyhow::Result;
-use embedded_hal::digital::OutputPin;
-use esp_idf_hal::gpio::{AnyOutputPin, Input, Level, Output, PinDriver, AnyInputPin};
+use esp_idf_hal::gpio::{Input, Output, PinDriver};
 use esp_idf_hal::peripheral::Peripheral;
 use esp_idf_hal::spi::{SpiDeviceDriver};
 use lora_phy::sx127x::{Sx127x, Sx1276, Config};
@@ -10,7 +9,7 @@ use lora_phy::mod_params::{Bandwidth, CodingRate, ModulationParams, PacketParams
 use lora_phy::{LoRa, RxMode};
 use embassy_time::Delay;
 use esp_idf_hal::spi::SpiDriver as hal_SpiDriver;
-use crate::spi_adapter::AsyncSpiAdapter;
+use super::spi_adapter::AsyncSpiAdapter;
 use log::*;
 
 
@@ -112,7 +111,7 @@ where
         self.driver.tx().await
     }
 
-    pub async fn receive(&mut self, buffer: &mut [u8], timeout_ms: u32) -> Result<(u8, lora_phy::mod_params::PacketStatus), RadioError> {
+    pub async fn receive(&mut self, buffer: &mut [u8]) -> Result<(u8, lora_phy::mod_params::PacketStatus), RadioError> {
         let _ = self.driver.prepare_for_rx(RxMode::Continuous, &self.modulation, &self.packet_params).await;
         self.driver.rx(& mut self.packet_params, buffer).await
     }
