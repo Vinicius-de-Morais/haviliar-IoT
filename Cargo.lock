@@ -695,10 +695,14 @@ dependencies = [
 name = "factory"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "embassy-time",
  "embedded-hal 1.0.0",
  "embedded-hal-async",
  "esp-idf-hal",
+ "esp-idf-sys",
  "hal",
+ "lora-phy",
 ]
 
 [[package]]
@@ -871,8 +875,6 @@ name = "haviliar-iot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "embedded-graphics",
- "embedded-hal 1.0.0",
  "embuild",
  "esp-idf-hal",
  "esp-idf-svc",
@@ -881,7 +883,6 @@ dependencies = [
  "hal",
  "heapless 0.9.1",
  "log",
- "ssd1306",
 ]
 
 [[package]]
