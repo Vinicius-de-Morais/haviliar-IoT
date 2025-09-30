@@ -6,15 +6,20 @@ edition = "2021"
 resolver = "2"
 rust-version = "1.77"
 
-[workspace]
-members = [
-    ".",
-    "hal",
-    "factory"
-]
+#[workspace]
+#members = [
+#    ".",
+#    "hal",
+#    "factory"
+#]
 
 [[bin]]
 name = "haviliar-iot"
+harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
+
+[[bin]]
+name = "display"
+path = "bin/display.rs"
 harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
 
 [profile.release]
@@ -30,15 +35,21 @@ default = []
 experimental = ["esp-idf-svc/experimental"]
 
 [dependencies]
-hal = { path = "hal" }
-factory = { path = "factory" }
+#hal = { path = "hal" }
+#factory = { path = "factory" }
 log = "0.4"
 esp-idf-svc = "0.51"
 esp-idf-sys = { version = "0.36.1", features = ["binstart"] }
-esp-idf-hal = "0.45.2"
+esp-idf-hal = { version = "0.45.2", features = ["alloc"]}
 anyhow = "1.0.99"
 heapless = "0.9.1"
-
+embedded-graphics = "0.8.1"
+ssd1306 = { version = "0.10", features = ["graphics"] }
+embedded-hal = "1.0.0"
+embedded-hal-async = "1.0.0"
+lora-phy = { version = "3.0.1" }
+embassy-time = "0.5.0"
+alloc = { version = "0.10.5", package = "linked_list_allocator", optional = true }
 
 # --- Optional Embassy Integration ---
 # esp-idf-svc = { version = "0.51", features = ["critical-section", "embassy-time-driver", "embassy-sync"] }
