@@ -3,11 +3,11 @@
 use anyhow::Result;
 use core::fmt::Write;
 use esp_idf_hal::{
-    delay::FreeRtos, gpio::PinDriver, prelude::Peripherals
+    delay::FreeRtos, prelude::Peripherals
 };
 use esp_idf_sys as _;
 use log::*;
-use haviliar_iot::factory::display_factory::DisplayFactory;
+use haviliar_iot::{factory::display_factory::DisplayFactory, hal::peripheral_manager::PeripheralManager};
 
 #[no_mangle]
 fn main() -> Result<()> {
@@ -19,17 +19,33 @@ fn main() -> Result<()> {
 
     // Configuração dos periféricos
     let peripherals = Peripherals::take().unwrap();
-    let (i2c, sda, scl, rst_pin) = DisplayFactory::get_peripherals(peripherals);
-    let mut rst_pin = PinDriver::output(rst_pin).unwrap();
+    // let (i2c, sda, scl, rst_pin) = DisplayFactory::get_peripherals(peripherals);
+    // let mut rst_pin = PinDriver::output(rst_pin).unwrap();
 
-    // Reset manual do display com timing mais longo
-    rst_pin.set_low().unwrap();
-    FreeRtos::delay_ms(50);  // Increased delay
-    rst_pin.set_high().unwrap();
-    FreeRtos::delay_ms(50);  // Add delay after reset
+    // // Reset manual do display com timing mais longo
+    // rst_pin.set_low().unwrap();
+    // FreeRtos::delay_ms(50);  // Increased delay
+    // rst_pin.set_high().unwrap();
+    // FreeRtos::delay_ms(50);  // Add delay after reset
     
-    let i2c = DisplayFactory::create_i2c_driver(i2c, sda, scl);
-    let mut display = DisplayFactory::create_from_i2c(i2c);
+    // let i2c = DisplayFactory::create_i2c_driver(i2c, sda, scl);
+    // let mut display = DisplayFactory::create_from_i2c(i2c);
+    
+    let mut peripheral_manager = PeripheralManager::new(peripherals);
+
+    // Reset display first
+    if let Err(e) = DisplayFactory::reset_display_from_manager(&mut peripheral_manager) {
+        error!("Failed to reset display: {}", e);
+    }
+    
+    // Create display from manager
+    let mut display = match DisplayFactory::create_from_manager(&mut peripheral_manager) {
+        Ok(display) => display,
+        Err(e) => {
+            error!("Failed to create display: {}", e);
+            return Err(anyhow::anyhow!("Display initialization failed"));
+        }
+    };    
 
     if let Err(e) = display.show_message("Iniciando") {
         error!("Failed to show initial message: {:?}", e);

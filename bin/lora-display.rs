@@ -1,61 +1,88 @@
-use std::error::Error;
-use std::thread;
-use std::time::Duration;
+#![no_std]
+#![no_main]
+use anyhow::Result;
+use core::fmt::Write;
+use esp_idf_hal::{
+    delay::FreeRtos, prelude::Peripherals
+};
+use esp_idf_sys as _;
+use log::*;
+use haviliar_iot::factory::display_factory::DisplayFactory;
+use haviliar_iot::factory::lora_factory::LoraFactory;
+use haviliar_iot::hal::peripheral_manager::PeripheralManager;
 
-// Import your custom structs and libraries here
-// e.g., use your_crate::{LoRaDevice, Display, Packet};
+#[no_mangle]
+fn main() -> Result<()> {
+    // Setup do logger
+    esp_idf_sys::link_patches();
+    esp_idf_svc::log::EspLogger::initialize_default();
 
-fn main() -> Result<(), Box<dyn Error>> {
-    // Initialize LoRa device
-    // Replace with your specific initialization code
-    let mut lora = LoRaDevice::new()?;
+    info!("Inicializando...");
+
+    // Initialize peripheral manager - much cleaner approach!
+    let peripherals = Peripherals::take().unwrap();
+    let mut peripheral_manager = PeripheralManager::new(peripherals);
+
+    // Reset display first
+    if let Err(e) = DisplayFactory::reset_display_from_manager(&mut peripheral_manager) {
+        error!("Failed to reset display: {}", e);
+    }
     
-    // Initialize display
-    // Replace with your specific display initialization
-    let mut display = Display::new()?;
-    
-    // Display startup message
-    display.clear()?;
-    display.print_line(0, "LoRa Sender")?;
-    display.print_line(1, "Initializing...")?;
-    display.update()?;
-    
-    let mut packet_counter = 0;
-    
-    // Main loop
+    // Create display from manager
+    let mut display = match DisplayFactory::create_from_manager(&mut peripheral_manager) {
+        Ok(display) => display,
+        Err(e) => {
+            error!("Failed to create display: {}", e);
+            return Err(anyhow::anyhow!("Display initialization failed"));
+        }
+    };
+
+    // Create LoRa components from manager
+    let (_lora_spi_driver, _lora_dio1, _lora_rst) = match LoraFactory::create_from_manager(&mut peripheral_manager) {
+        Ok(components) => components,
+        Err(e) => {
+            error!("Failed to create LoRa components: {:?}", e);
+            return Err(e);
+        }
+    };
+
+    info!("Both display and LoRa initialized successfully!");
+
+    if let Err(e) = display.show_message("Iniciando") {
+        error!("Failed to show initial message: {:?}", e);
+    }
+    FreeRtos::delay_ms(2000);
+
+    // Loop principal
+    let mut counter = 0;
     loop {
-        // Create a packet using your struct
-        packet_counter += 1;
-        let packet = Packet::new()
-            .with_id(packet_counter)
-            .with_payload(&format!("Test message #{}", packet_counter))
-            .build();
+        if let Err(e) = display.clear() {
+            error!("Failed to clear display: {:?}", e);
+            continue;
+        }
+
+        // Texto estático
+        if let Err(e) = display.text_new_line("Display + LoRa OK!", 1) {
+            error!("Failed to write text: {:?}", e);
+        }
+        if let Err(e) = display.text_new_line("Contador:", 2) {
+            error!("Failed to write text: {:?}", e);
+        }
+
+        // Contador
+        let mut counter_str = heapless::String::<10>::new();
+        write!(&mut counter_str, "{}", counter).unwrap();
         
-        // Send the packet
-        match lora.send_packet(&packet) {
-            Ok(_) => {
-                println!("Packet #{} sent successfully", packet_counter);
-                
-                // Update display with success info
-                display.clear()?;
-                display.print_line(0, "LoRa Sender")?;
-                display.print_line(1, &format!("Packet #{} sent", packet_counter))?;
-                display.print_line(2, &format!("RSSI: {}", lora.get_rssi())?)?;
-                display.update()?;
-            },
-            Err(e) => {
-                eprintln!("Failed to send packet: {}", e);
-                
-                // Update display with error info
-                display.clear()?;
-                display.print_line(0, "LoRa Sender")?;
-                display.print_line(1, "Send failed!")?;
-                display.print_line(2, &e.to_string())?;
-                display.update()?;
-            }
+        if let Err(e) = display.text_new_line(&counter_str, 3) {
+            error!("Failed to write counter: {:?}", e);
         }
         
-        // Wait before sending next packet
-        thread::sleep(Duration::from_secs(5));
+        if let Err(e) = display.flush() {
+            error!("Failed to flush display: {:?}", e);
+        }        
+        info!("Contador: {}", counter);
+        counter += 1;
+        
+        FreeRtos::delay_ms(1000);
     }
 }

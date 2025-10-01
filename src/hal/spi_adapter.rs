@@ -88,7 +88,7 @@ where
                         ));
                     }
                 }
-                Operation::TransferInPlace(items) => {
+                Operation::TransferInPlace(_items) => {
                     // Create a temporary buffer with the same content
                     // let mut write_data: &[u8];
                     // items.clone_into(write_data);
