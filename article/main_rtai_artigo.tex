@@ -71,13 +71,13 @@ sumario=tradicional
 \vspace{1cm}
 
 % Definindo as notas de rodapé para cada autor
-\footnotetext[1]{UniSENAI PR, gab.gabriel.1003@outlook.com}
-\footnotetext[2]{UniSENAI PR, email, etc.)}
-\footnotetext[3]{UniSENAI PR, email, etc.)}
-\footnotetext[4]{UniSENAI PR, email, etc.)}
-\footnotetext[5]{UniSENAI PR, email, etc.)}
-\footnotetext[6]{UniSENAI PR, email, etc.)}
-\footnotetext[7]{UniSENAI PR, email, etc.)}
+\footnotetext[1]{UniSENAI PR, angeloavelino33211781@gmail.com}
+\footnotetext[2]{UniSENAI PR, gab.gabriel.1003@outlook.com)}
+\footnotetext[3]{UniSENAI PR, pafrasson@gmail.com)}
+\footnotetext[4]{UniSENAI PR, lucasbortolisantos@gmail.com)}
+\footnotetext[5]{UniSENAI PR, huan.luchetti@gmail.com)}
+\footnotetext[6]{UniSENAI PR, vinicius.santos00857469@sesisenaipr.org.br)}
+\footnotetext[7]{UniSENAI PR, cinthya.silva@docente.senai.br)}
 
 \vspace{1cm}
 
@@ -137,15 +137,15 @@ sumario=tradicional
 \section{Introdução}
 \addcontentsline{toc}{section}{Introdução}
 
-No contexto das Smart Cities, a Internet das Coisas (IoT) tem se destacado como uma tecnologia transformadora, permitindo a interconexão de dispositivos e sistemas para otimizar processos e melhorar a eficiência. A adoção de protocolos de comunicação eficientes é crucial para o sucesso dessas aplicações, especialmente em ambientes com conectividade limitada. Nesse cenário, o protocolo LoRa (Long Range) tem emergido como uma solução promissora devido à sua capacidade de comunicação de longo alcance com baixo consumo de energia \cite{Yoon2020}.
+    No contexto das Smart Cities, a Internet das Coisas (IoT) tem se destacado como uma tecnologia transformadora, permitindo a interconexão de dispositivos e sistemas para otimizar processos e melhorar a eficiência. A adoção de protocolos de comunicação eficientes é crucial para o sucesso dessas aplicações, especialmente em ambientes com conectividade limitada. Nesse cenário, o protocolo LoRa (Long Range) tem emergido como uma solução promissora devido à sua capacidade de comunicação de longo alcance com baixo consumo de energia \cite{Yoon2020}.
 
-Para maior versatilidade na transmissão de dados, a adoção de um gateway LoRa-MQTT (Message Queuing Telemetry Transport) tem se mostrado eficaz. O gateway atua como intermediário entre os dispositivos LoRa e a nuvem, facilitando a transmissão de dados de sensores e atuadores para plataformas de análise e monitoramento em tempo real \cite{Bhawiyuga2019}.
+    Para maior versatilidade na transmissão de dados, a adoção de um gateway LoRa-MQTT (Message Queuing Telemetry Transport) tem se mostrado eficaz. O gateway atua como intermediário entre os dispositivos LoRa e a nuvem, facilitando a transmissão de dados de sensores e atuadores para plataformas de análise e monitoramento em tempo real \cite{Bhawiyuga2019}.
 
-A existência de edifícios pode interferir na comunicação LoRa, como ressalta \cite{lima2023}. Contudo, esse efeito pode ser minimizado com o uso de antenas de maior ganho e com o posicionamento estratégico dos dispositivos.
+    A existência de edifícios pode interferir na comunicação LoRa, como ressalta \cite{lima2023}. Contudo, esse efeito pode ser minimizado com o uso de antenas de maior ganho e com o posicionamento estratégico dos dispositivos.
 
-Diante desse contexto, este artigo propõe o desenvolvimento de um sistema de controle remoto de cancelas de estacionamento utilizando a tecnologia LoRa e o protocolo MQTT. A solução visa permitir o gerenciamento eficiente e seguro das cancelas a partir de qualquer local com acesso à internet, oferecendo uma alternativa prática, de baixo custo e escalável para aplicações urbanas.
+    Diante desse contexto, este artigo propõe o desenvolvimento de um sistema de controle remoto de cancelas de estacionamento utilizando a tecnologia LoRa e o protocolo MQTT. A solução visa permitir o gerenciamento eficiente e seguro das cancelas a partir de qualquer local com acesso à internet, oferecendo uma alternativa prática, de baixo custo e escalável para aplicações urbanas.
 
-O artigo está organizado da seguinte forma: a Seção 2 descreve os fundamentos teóricos, a Seção 3 apresenta a arquitetura proposta, a Seção 4 discute os resultados e, por fim, a Seção 5 apresenta as conclusões.
+    O artigo está organizado da seguinte forma: a Seção 2 descreve os fundamentos teóricos, a Seção 3 apresenta a arquitetura proposta, a Seção 4 discute os resultados e, por fim, a Seção 5 apresenta as conclusões.
 
 % A introdução deve apresentar uma visão geral do artigo, delimitando o tema e o problema a ser abordado, bem como o (s) objetivo (s) e a justificativa. O intuito é chamar a atenção do leitor para o assunto que será apresentado no artigo, sem aprofundar conceitos ou antecipar resultados. 
 
@@ -154,34 +154,35 @@ O artigo está organizado da seguinte forma: a Seção 2 descreve os fundamentos
 % ----------------------------------------------------------
 \section{Fundamentação Teórica}
 
-\subsection{Internet das Coisas (IoT)}
-A Internet das Coisas (IoT) consiste em um ecossistema de dispositivos interconectados capazes de coletar, processar e transmitir dados em tempo real, promovendo a integração entre o mundo físico e digital \cite{lima2023}. Esse paradigma é aplicado em diversos setores, como agricultura, cidades inteligentes e monitoramento ambiental. No entanto, ainda enfrenta desafios relacionados à escalabilidade, interoperabilidade entre dispositivos e limitações de consumo energético \cite{huh2019}. Nesse contexto, soluções de conectividade de baixo custo e baixo consumo surgem como alternativas promissoras para viabilizar a expansão da IoT.
+    \subsection{Internet das Coisas (IoT)}
+    A Internet das Coisas (IoT) consiste em um ecossistema de dispositivos interconectados capazes de coletar, processar e transmitir dados em tempo real, promovendo a integração entre o mundo físico e digital \cite{lima2023}. Esse paradigma é aplicado em diversos setores, como agricultura, cidades inteligentes e monitoramento ambiental. No entanto, ainda enfrenta desafios relacionados à escalabilidade, interoperabilidade entre dispositivos e limitações de consumo energético \cite{huh2019}. Nesse contexto, soluções de conectividade de baixo custo e baixo consumo surgem como alternativas promissoras para viabilizar a expansão da IoT.
 
-\subsection{LoRa}
-O protocolo LoRa (Long Range) é uma tecnologia de comunicação sem fio da categoria LPWAN (\textit{Low Power Wide Area Network}), que se destaca por oferecer grande alcance (até 15 km em áreas abertas) aliado ao baixo consumo de energia \cite{lima2023}. A modulação utilizada é baseada em espalhamento espectral por chirp (\textit{Chirp Spread Spectrum — CSS}), que garante maior robustez contra interferências. Já o protocolo LoRaWAN atua na camada de rede, fornecendo mecanismos de autenticação, criptografia e diferentes classes de dispositivos (A, B e C), possibilitando comunicação bidirecional e segura \cite{huh2019}. Apesar de suas vantagens, o LoRaWAN apresenta limitações, como a alta taxa de colisão de pacotes em cenários com muitos dispositivos transmitindo simultaneamente.
+    \subsection{LoRa}
+    O protocolo LoRa (Long Range) é uma tecnologia de comunicação sem fio da categoria LPWAN (\textit{Low Power Wide Area Network}), que se destaca por oferecer grande alcance (até 15 km em áreas abertas) aliado ao baixo consumo de energia \cite{lima2023}. A modulação utilizada é baseada em espalhamento espectral por chirp (\textit{Chirp Spread Spectrum — CSS}), que garante maior robustez contra interferências. Já o protocolo LoRaWAN atua na camada de rede, fornecendo mecanismos de autenticação, criptografia e diferentes classes de dispositivos (A, B e C), possibilitando comunicação bidirecional e segura \cite{huh2019}. Apesar de suas vantagens, o LoRaWAN apresenta limitações, como a alta taxa de colisão de pacotes em cenários com muitos dispositivos transmitindo simultaneamente.
 
-\subsection{MQTT}
-O MQTT (Message Queuing Telemetry Transport) é um protocolo de comunicação leve, desenvolvido sobre TCP/IP, baseado no modelo \textit{publish-subscribe} \cite{Yoon2020}. Sua arquitetura envolve três elementos principais: \textit{publisher}, \textit{subscriber} e \textit{broker}. Esse protocolo se destaca por exigir baixa largura de banda, oferecer três níveis de Qualidade de Serviço (QoS) e garantir confiabilidade na entrega de mensagens em ambientes com restrições de energia e conectividade \cite{Bhawiyuga2019}. Devido a essas características, o MQTT é amplamente adotado em sistemas IoT que integram sensores, atuadores e plataformas em nuvem.
+    \subsection{MQTT}
+    O MQTT (Message Queuing Telemetry Transport) é um protocolo de comunicação leve, desenvolvido sobre TCP/IP, baseado no modelo \textit{publish-subscribe} \cite{Yoon2020}. Sua arquitetura envolve três elementos principais: \textit{publisher}, \textit{subscriber} e \textit{broker}. Esse protocolo se destaca por exigir baixa largura de banda, oferecer três níveis de Qualidade de Serviço (QoS) e garantir confiabilidade na entrega de mensagens em ambientes com restrições de energia e conectividade \cite{Bhawiyuga2019}. Devido a essas características, o MQTT é amplamente adotado em sistemas IoT que integram sensores, atuadores e plataformas em nuvem.
 
-\subsection{Aplicações Práticas}
-A combinação de LoRa e MQTT tem sido explorada em diferentes contextos práticos. Na aquicultura, Bhawiyuga et al. (2019) propuseram um sistema em que sensores de pH, oxigênio dissolvido e turbidez transmitem dados via LoRa para um gateway, que os encaminha para a nuvem através do MQTT \cite{Bhawiyuga2019}. Já no contexto agrícola, Yoon et al. (2020) desenvolveram a L\&M Farm, um sistema de irrigação inteligente que coleta dados de solo e clima, utilizando LoRa para comunicação entre sensores e atuadores, enquanto o MQTT garante a integração com aplicações web para tomada de decisão \cite{Yoon2020}. Esses estudos evidenciam o potencial da integração entre ambas as tecnologias para melhorar eficiência, reduzir custos e ampliar a automação em ambientes distribuídos.
+    \subsection{Aplicações Práticas}
+    A combinação de LoRa e MQTT tem sido explorada em diferentes contextos práticos. Na aquicultura, Bhawiyuga et al. (2019) propuseram um sistema em que sensores de pH, oxigênio dissolvido e turbidez transmitem dados via LoRa para um gateway, que os encaminha para a nuvem através do MQTT \cite{Bhawiyuga2019}. Já no contexto agrícola, Yoon et al. (2020) desenvolveram a L\&M Farm, um sistema de irrigação inteligente que coleta dados de solo e clima, utilizando LoRa para comunicação entre sensores e atuadores, enquanto o MQTT garante a integração com aplicações web para tomada de decisão \cite{Yoon2020}. Esses estudos evidenciam o potencial da integração entre ambas as tecnologias para melhorar eficiência, reduzir custos e ampliar a automação em ambientes distribuídos.
 
-\subsection{ESP32}
-O microcontrolador ESP32 é amplamente utilizado em projetos IoT devido ao seu baixo custo, suporte a múltiplos protocolos de comunicação (Wi-Fi, Bluetooth e LoRa, em versões específicas), alta capacidade de processamento e baixo consumo energético \cite{lima2023}. A integração do ESP32 com módulos LoRa possibilita o desenvolvimento de protótipos de fácil implementação, capazes de transmitir dados em tempo real para plataformas de visualização e armazenamento. Testes práticos realizados por Lima (2023) demonstraram a capacidade de transmissão de dados em distâncias superiores a 10 km em ambientes abertos, ressaltando seu potencial para aplicações em áreas rurais e remotas.
+    \subsection{ESP32}
+    O microcontrolador ESP32 é amplamente utilizado em projetos IoT devido ao seu baixo custo, suporte a múltiplos protocolos de comunicação (Wi-Fi, Bluetooth e LoRa, em versões específicas), alta capacidade de processamento e baixo consumo energético \cite{lima2023}. A integração do ESP32 com módulos LoRa possibilita o desenvolvimento de protótipos de fácil implementação, capazes de transmitir dados em tempo real para plataformas de visualização e armazenamento. Testes práticos realizados por Lima (2023) demonstraram a capacidade de transmissão de dados em distâncias superiores a 10 km em ambientes abertos, ressaltando seu potencial para aplicações em áreas rurais e remotas.
 
-\subsection{Redes Mesh com LoRa}
-Embora o LoRaWAN tradicional adote uma topologia em estrela, pesquisas recentes indicam que sua aplicação em redes privadas pode enfrentar limitações de cobertura e confiabilidade. Nesse sentido, Huh e Kim (2019) propuseram uma versão modificada do protocolo, com suporte a redes \textit{mesh} e esquemas de múltiplo acesso para reduzir colisões de pacotes \cite{huh2019}. Em redes \textit{mesh}, cada nó pode atuar como roteador, aumentando a cobertura e permitindo rotas alternativas para transmissão de dados. Essa abordagem se mostrou eficaz em cenários como monitoramento ambiental em estaleiros e controle inteligente de iluminação pública, dispensando a necessidade de múltiplos gateways e reduzindo custos de infraestrutura.
+    \subsection{Redes Mesh com LoRa}
+    Embora o LoRaWAN tradicional adote uma topologia em estrela, pesquisas recentes indicam que sua aplicação em redes privadas pode enfrentar limitações de cobertura e confiabilidade. Nesse sentido, Huh e Kim (2019) propuseram uma versão modificada do protocolo, com suporte a redes \textit{mesh} e esquemas de múltiplo acesso para reduzir colisões de pacotes \cite{huh2019}. Em redes \textit{mesh}, cada nó pode atuar como roteador, aumentando a cobertura e permitindo rotas alternativas para transmissão de dados. Essa abordagem se mostrou eficaz em cenários como monitoramento ambiental em estaleiros e controle inteligente de iluminação pública, dispensando a necessidade de múltiplos gateways e reduzindo custos de infraestrutura.
+
 \section{Metodologia}
-    
-Aqui deve-se descrever a metodologia utilizada no trabalho. Sugere-se a seguinte estrutura: classificação do tipo da pesquisa (quanto aos fins e quanto aos meios); descrição de onde foi feita a pesquisa (unidade de análise ou universo e amostra); informações sobre a coleta dos dados (detalhamento dos instrumentos de coleta e procedimentos utilizados) e explicações sobre como os analisou (pesquisa qualitativa e/ou quantitativa).
+        
+    Aqui deve-se descrever a metodologia utilizada no trabalho. Sugere-se a seguinte estrutura: classificação do tipo da pesquisa (quanto aos fins e quanto aos meios); descrição de onde foi feita a pesquisa (unidade de análise ou universo e amostra); informações sobre a coleta dos dados (detalhamento dos instrumentos de coleta e procedimentos utilizados) e explicações sobre como os analisou (pesquisa qualitativa e/ou quantitativa).
 
-É importante detalhar especificamente o protocolo utilizado na coleta de dados: explique se houve realização de entrevistas ou aplicação de questionário. Cite a fonte do questionário/formulário, caso não tenha sido elaborado exclusivamente para essa pesquisa; explique quem e quantos foram os entrevistados ou pesquisados, como os escolheu, como e quando ocorreu a pesquisa. 
+    É importante detalhar especificamente o protocolo utilizado na coleta de dados: explique se houve realização de entrevistas ou aplicação de questionário. Cite a fonte do questionário/formulário, caso não tenha sido elaborado exclusivamente para essa pesquisa; explique quem e quantos foram os entrevistados ou pesquisados, como os escolheu, como e quando ocorreu a pesquisa. 
 
-Explique se houve coleta de dados documental (acesso a documentos ou sistema de alguma empresa ou instituição), como e porque ocorreu tal coleta; explique se houve coleta de dados por observação (filmagens, por exemplo), como e porque ocorreu tal coleta; explique se houve realização de testes, experimentos ou construção de equipamentos em bancadas, laboratórios ou oficinas (como e onde ocorreu). Essa seção deve ter no máximo duas páginas.
+    Explique se houve coleta de dados documental (acesso a documentos ou sistema de alguma empresa ou instituição), como e porque ocorreu tal coleta; explique se houve coleta de dados por observação (filmagens, por exemplo), como e porque ocorreu tal coleta; explique se houve realização de testes, experimentos ou construção de equipamentos em bancadas, laboratórios ou oficinas (como e onde ocorreu). Essa seção deve ter no máximo duas páginas.
 
-\section{Apresentação de discussão dos resultados}
-Nessa seção devem constar os resultados encontrados na pesquisa, visando cumprir os objetivos propostos, através da metodologia especificada na seção anterior. É facultado ao autor dividir essa seção em subseções conforme ABNT NBR 6024 (2012). 
-(Caso sua pesquisa seja uma Pesquisa Bibliográfica use como título desta seção apenas Discussão)
+% \section{Apresentação de discussão dos resultados}
+%     Nessa seção devem constar os resultados encontrados na pesquisa, visando cumprir os objetivos propostos, através da metodologia especificada na seção anterior. É facultado ao autor dividir essa seção em subseções conforme ABNT NBR 6024 (2012). 
+%     (Caso sua pesquisa seja uma Pesquisa Bibliográfica use como título desta seção apenas Discussão)
 
 
 
@@ -194,11 +195,11 @@ Nessa seção devem constar os resultados encontrados na pesquisa, visando cumpr
     % ---
     % Conclusão
     % ---
- \section{Considerações finais}
- \addcontentsline{toc}{section}{Considerações finais}
- Parte final do artigo, na qual o autor evidencia que os objetivos foram cumpridos, destaca os principais resultados obtidos e deixa sugestões para estudos futuros acerca do tema estudado.
- 
-Na conclusão não se utiliza citações, ilustrações e não se apresenta resultados ou conceitos novos (que não haviam sido apresentados anteriormente no texto).
+    % \section{Considerações finais}
+    % \addcontentsline{toc}{section}{Considerações finais}
+    % Parte final do artigo, na qual o autor evidencia que os objetivos foram cumpridos, destaca os principais resultados obtidos e deixa sugestões para estudos futuros acerca do tema estudado.
+    
+    % Na conclusão não se utiliza citações, ilustrações e não se apresenta resultados ou conceitos novos (que não haviam sido apresentados anteriormente no texto).
 
     
         
@@ -220,31 +221,31 @@ Na conclusão não se utiliza citações, ilustrações e não se apresenta resu
     % ----------------------------------------------------------
     % Apêndices
     % ----------------------------------------------------------
-    \vspace{1cm}
-    \begin{apendicesenv}
+    % \vspace{1cm}
+    % \begin{apendicesenv}
         
-        % ----------------------------------------------------------
-        \chapter{Nullam elementum urna vel imperdiet sodales elit ipsum pharetra ligula
-            ac pretium ante justo a nulla curabitur tristique arcu eu metus}
-        % ----------------------------------------------------------
-        \lipsum[55-57]
+    %     % ----------------------------------------------------------
+    %     \chapter{Nullam elementum urna vel imperdiet sodales elit ipsum pharetra ligula
+    %         ac pretium ante justo a nulla curabitur tristique arcu eu metus}
+    %     % ----------------------------------------------------------
+    %     \lipsum[55-57]
         
-    \end{apendicesenv}
+    % \end{apendicesenv}
     % ---
     
     % ----------------------------------------------------------
     % Anexos
     % ----------------------------------------------------------
-    \cftinserthook{toc}{AAA}
-    \vspace{1cm}
-    \begin{anexosenv}
+    % \cftinserthook{toc}{AAA}
+    % \vspace{1cm}
+    % \begin{anexosenv}
         
-        % ---
-        \chapter{Cras non urna sed feugiat cum sociis natoque penatibus et magnis dis
-            parturient montes nascetur ridiculus mus}
-        % ---
+    %     % ---
+    %     \chapter{Cras non urna sed feugiat cum sociis natoque penatibus et magnis dis
+    %         parturient montes nascetur ridiculus mus}
+    %     % ---
         
-        \lipsum[31]
+    %     \lipsum[31]
         
-    \end{anexosenv}
+    % \end{anexosenv}
 \end{document}
