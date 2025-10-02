@@ -152,102 +152,25 @@ O artigo está organizado da seguinte forma: a Seção 2 descreve os fundamentos
 % ----------------------------------------------------------
 % Seção de explicações
 % ----------------------------------------------------------
-\section{Fundamentação teórica}
+\section{Fundamentação Teórica}
 
-Parte que embasa cientificamente o trabalho. Deve-se expor o assunto tratado de forma pormenorizada e ordenada, divide-se em seções e subseções de acordo com o tipo de trabalho. A seção Fundamentação teórica, assim como as demais seções e subseções devem ser separadas do texto que a antecede e que a precede por 1 (um) espaço de entrelinhas de 1,5 cm.
+\subsection{Internet das Coisas (IoT)}
+A Internet das Coisas (IoT) consiste em um ecossistema de dispositivos interconectados capazes de coletar, processar e transmitir dados em tempo real, promovendo a integração entre o mundo físico e digital \cite{lima2023}. Esse paradigma é aplicado em diversos setores, como agricultura, cidades inteligentes e monitoramento ambiental. No entanto, ainda enfrenta desafios relacionados à escalabilidade, interoperabilidade entre dispositivos e limitações de consumo energético \cite{huh2019}. Nesse contexto, soluções de conectividade de baixo custo e baixo consumo surgem como alternativas promissoras para viabilizar a expansão da IoT.
 
-Todas as fontes de informação usadas devem ser citadas, conforme as orientações da ABNT NBR 10520 (2023). 
+\subsection{LoRa}
+O protocolo LoRa (Long Range) é uma tecnologia de comunicação sem fio da categoria LPWAN (\textit{Low Power Wide Area Network}), que se destaca por oferecer grande alcance (até 15 km em áreas abertas) aliado ao baixo consumo de energia \cite{lima2023}. A modulação utilizada é baseada em espalhamento espectral por chirp (\textit{Chirp Spread Spectrum — CSS}), que garante maior robustez contra interferências. Já o protocolo LoRaWAN atua na camada de rede, fornecendo mecanismos de autenticação, criptografia e diferentes classes de dispositivos (A, B e C), possibilitando comunicação bidirecional e segura \cite{huh2019}. Apesar de suas vantagens, o LoRaWAN apresenta limitações, como a alta taxa de colisão de pacotes em cenários com muitos dispositivos transmitindo simultaneamente.
 
-Essa seção não deve contemplar opiniões, experiências pessoais e/ou dados ou resultados da pesquisa de campo do referido estudo. Ela deve ser usada exclusivamente para apoiar bibliograficamente a temática do estudo/artigo.
+\subsection{MQTT}
+O MQTT (Message Queuing Telemetry Transport) é um protocolo de comunicação leve, desenvolvido sobre TCP/IP, baseado no modelo \textit{publish-subscribe} \cite{Yoon2020}. Sua arquitetura envolve três elementos principais: \textit{publisher}, \textit{subscriber} e \textit{broker}. Esse protocolo se destaca por exigir baixa largura de banda, oferecer três níveis de Qualidade de Serviço (QoS) e garantir confiabilidade na entrega de mensagens em ambientes com restrições de energia e conectividade \cite{Bhawiyuga2019}. Devido a essas características, o MQTT é amplamente adotado em sistemas IoT que integram sensores, atuadores e plataformas em nuvem.
 
-Priorize as citações indiretas em relação às citações diretas e quando não tiver acesso ao texto original use a regra da ABNT NBR 10520 (2023) apud - citação de citação.
+\subsection{Aplicações Práticas}
+A combinação de LoRa e MQTT tem sido explorada em diferentes contextos práticos. Na aquicultura, Bhawiyuga et al. (2019) propuseram um sistema em que sensores de pH, oxigênio dissolvido e turbidez transmitem dados via LoRa para um gateway, que os encaminha para a nuvem através do MQTT \cite{Bhawiyuga2019}. Já no contexto agrícola, Yoon et al. (2020) desenvolveram a L\&M Farm, um sistema de irrigação inteligente que coleta dados de solo e clima, utilizando LoRa para comunicação entre sensores e atuadores, enquanto o MQTT garante a integração com aplicações web para tomada de decisão \cite{Yoon2020}. Esses estudos evidenciam o potencial da integração entre ambas as tecnologias para melhorar eficiência, reduzir custos e ampliar a automação em ambientes distribuídos.
 
-Para palavras e/ou termos estrangeiras no texto, utilizar itálico. 
-De forma a facilitar a apresentação das citações na sequencia seguem exemplos dos dois modelos mais usados – citação indireta e citação direta, conforme ABNT NBR 10520 (2023).
-Citação indireta  (conceitual ou paráfrase) texto baseado na obra do autor consultado. Não usar aspas e não é obrigatório apresentar páginação.
+\subsection{ESP32}
+O microcontrolador ESP32 é amplamente utilizado em projetos IoT devido ao seu baixo custo, suporte a múltiplos protocolos de comunicação (Wi-Fi, Bluetooth e LoRa, em versões específicas), alta capacidade de processamento e baixo consumo energético \cite{lima2023}. A integração do ESP32 com módulos LoRa possibilita o desenvolvimento de protótipos de fácil implementação, capazes de transmitir dados em tempo real para plataformas de visualização e armazenamento. Testes práticos realizados por Lima (2023) demonstraram a capacidade de transmissão de dados em distâncias superiores a 10 km em ambientes abertos, ressaltando seu potencial para aplicações em áreas rurais e remotas.
 
-Exemplo:  Segundo Foster (2011) depois de aprender e armazenar novas informações podemos selecionar, interpretar, e integrar uma coisa à outra – para fazer um melhor uso do que aprendemos e lembramos.
-
-Citação direta (literal ou textual) é a transcrição de palavras ou trechos de outro autor e podem ser apresentadas de duas maneiras:
-Exemplo - Citação direta (breve) - citação com menos de três linhas, autor inserido no texto usando aspas (“”)
-
-Exemplo 1 - a) Segundo Santos (2018, p. 240) “[...] trecho do texto do autor citado tal e qual a obra original.” b) Quando a autoria for apresentada no final da citação, observar o seguinte exemplo: “[...] trecho do autor citado tal e qual obra original.” (Santos, 2018, p. 240)
-
-Exemplo 2 -  citação direta, com mais de três linhas ,deve ser destacada com recuo padronizado em relação à margem esquerda, com letra menor que a utilizada no texto, em espaçamento simples e sem aspas. Recomenda-se o recuo de 4cm. ABNT NBR 10520 (2023).
-    
-    \begin{citacao}
-        \lipsum[2]
-    \end{citacao}
-    
-    \lipsum[3]
-
-    
-    \subsection{Título secundário}
-    
-  (Subdivisão do texto a partir de uma seção primária) Exemplo: 2.1 Assunto de relação dentro do assunto primário / 2.2 Assunto de relação dentro do assunto secundário). Consulte ABNT NBR 6024 (2012).
-
-  \subsubsection{Título terciário}
-(Subdivisão do texto a partir de uma seção secundária) 
-Exemplo: 2.1.1 Assunto de relação dentro do assunto secundário/ 2.1.2 Assunto de relação dentro do assunto secundário). Consulte ABNT NBR 6024 (2012)
-
-O autor tem liberdade para nomear as subdivisões como achar conveniente para o trabalho, devendo apenas evitar tópicos considerados curtos (menos de meia página). 
-É importante lembrar que os trabalhos acadêmicos requerem um encadeamento lógico e muito embora ilustrações contribuam significativamente para a compreensão do trabalho e melhor priorizar a exposição das ideias.
-
-**Importante: O texto deve ser precedidos ou antecedidos de comentários, conforme exemplo a seguir: “O Quadro 1 demonstra [...]” – (não usar: “A seguir” / “Abaixo”).
-
-Segundo a ABNT NBR 14724 (2011), qualquer que seja o tipo (desenho esquema, fluxograma, fotografia, gráfico, mapa, organograma, planta, quadro, retrato, figura, imagem, entre outros) sua identificação deverá aparecer na parte superior, precedida da palavra designativa, seguida de seu número de ordem de ocorrência no texto, em algarismos arábicos, travessão e do respectivo título de forma centralizada. Após a ilustração, na parte inferior, indicar a fonte consultada (elemento obrigatório, mesmo que seja produção do próprio autor), legenda, notas e outras informações necessárias à sua compreensão (se houver) de forma alinhada a esquerda da ilustração apresentada. A ilustração devem ser padronizadas, devem ser citadas no texto seguindo o sistema autor-data conforme NBR 10520 (2023), bem como estar inseridas o mais próximo possível do trecho a que se refere.
-
-Exemplo de lista de itens numerada:
-\begin{enumerate}
-\item Item numerado 1.
-\item Item numerado 2.
-\item Item numerado 3.
-\item Item numerado 4.
-\item Item numerado 5.
-\end{enumerate}
-
-A equação (\ref{eq:fx}) é um exemplo de equação inserida usando o ambiente LaTeX e numerada automaticamente.
-
-\begin{equation}
-\label{eq:fx}
-f(x) = \frac{1}{\alpha} \int_0^L \left(\frac{x^2}{2} -\frac{x^3}{3}\right) \mathrm{d} x
-\end{equation}
-
-
-A Figura \ref{fig1} é um exemplo de figura inserida usando o ambiente LaTeX e numerada automaticamente.
-
-\begin{figure}[!htb]
-\centering%
-\caption{Título da figura.}%
-\label{fig1}
-\includegraphics[width = 0.5\columnwidth]{figuras/Imagem1.png}
-\\Fonte: Autoria própria.
-\end{figure}
-
-A Tabela 1 \ref{tab:Ldimens} é um exemplo de tabela inserida usando o ambiente LaTeX e numerada automaticamente.
-
-\begin{table}[!htb]
-\centering%
-\small%
-\caption{Exemplo de legenda de tabela.}%
-\label{tab:Ldimens}
-\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}cccc}
-\toprule
-$L$   & $L^2$     & $L^3$     & $L^4$     \\
-{[m]} & {[m$^2$]} & {[m$^3$]} & {[m$^4$]} \\
-\midrule
-1     & 1         & 1         & 1         \\
-2     & 4         & 8         & 16        \\
-3     & 9         & 27        & 81        \\
-4     & 16        & 64        & 256       \\
-5     & 25        & 125       & 625       \\
-\bottomrule
-\addlinespace
-\end{tabular*}
-\\Fonte: Autoria própria.
-\end{table}
-
-    
+\subsection{Redes Mesh com LoRa}
+Embora o LoRaWAN tradicional adote uma topologia em estrela, pesquisas recentes indicam que sua aplicação em redes privadas pode enfrentar limitações de cobertura e confiabilidade. Nesse sentido, Huh e Kim (2019) propuseram uma versão modificada do protocolo, com suporte a redes \textit{mesh} e esquemas de múltiplo acesso para reduzir colisões de pacotes \cite{huh2019}. Em redes \textit{mesh}, cada nó pode atuar como roteador, aumentando a cobertura e permitindo rotas alternativas para transmissão de dados. Essa abordagem se mostrou eficaz em cenários como monitoramento ambiental em estaleiros e controle inteligente de iluminação pública, dispensando a necessidade de múltiplos gateways e reduzindo custos de infraestrutura.
 \section{Metodologia}
     
 Aqui deve-se descrever a metodologia utilizada no trabalho. Sugere-se a seguinte estrutura: classificação do tipo da pesquisa (quanto aos fins e quanto aos meios); descrição de onde foi feita a pesquisa (unidade de análise ou universo e amostra); informações sobre a coleta dos dados (detalhamento dos instrumentos de coleta e procedimentos utilizados) e explicações sobre como os analisou (pesquisa qualitativa e/ou quantitativa).
