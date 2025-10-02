@@ -21,20 +21,20 @@ impl LoraFactory {
     pub fn create_from_manager<'d>(
         manager: &mut PeripheralManager,
     ) -> Result<(SpiDeviceDriver<'d, SpiDriver<'d>>, Gpio14, Gpio12), anyhow::Error> {
-        let (spi, sclk, sdo, sdi, cs, dio1, rst) = manager
+        let per = manager
             .take_lora_peripherals()
             .ok_or_else(|| anyhow::anyhow!("LoRa peripherals not available"))?;
         
         // Configuração do SPI
         let config = SpiDriverConfig::new();
-        let driver = SpiDriver::new(spi, sclk, sdo, Some(sdi), &config)
+        let driver = SpiDriver::new(per.spi, per.sclk, per.sdo, Some(per.sdi), &config)
             .map_err(|e| anyhow::anyhow!("Failed to create SPI driver: {:?}", e))?;
 
         let spi_config = Config::new().baudrate(Hertz(2_000_000));
-        let spi_driver = SpiDeviceDriver::new(driver, Some(cs), &spi_config)
+        let spi_driver = SpiDeviceDriver::new(driver, Some(per.cs), &spi_config)
             .map_err(|e| anyhow::anyhow!("Failed to create SPI device driver: {:?}", e))?;
 
-        Ok((spi_driver, dio1, rst))
+        Ok((spi_driver, per.dio1, per.rst))
     }
 
     /// Create SPI driver (separate from LoRa creation for better lifetime management)

@@ -5,12 +5,13 @@ use embedded_graphics::{
     prelude::*,
     text::{Alignment, Text},
 };
-use esp_idf_hal::i2c::I2cDriver;
+use esp_idf_hal::{delay::FreeRtos, gpio::{Gpio16, Output, PinDriver}, i2c::I2cDriver, peripheral::Peripheral, prelude::Peripherals};
 use esp_idf_sys as _;
 use log::*;
 use ssd1306::{mode::BufferedGraphicsMode, prelude::*, I2CDisplayInterface, Ssd1306};
 
 pub struct Display<'d> {
+    rst_pin: PinDriver<'d, Gpio16, Output>,
     display: Ssd1306<
         I2CInterface<I2cDriver<'d>>,
         DisplaySize128x64,
@@ -20,7 +21,8 @@ pub struct Display<'d> {
 }
 
 impl<'d> Display<'d> {
-    pub fn new(i2c_driver: I2cDriver<'d>) -> Result<Self> {
+    pub fn new(i2c_driver: I2cDriver<'d>, rst_pin: PinDriver<'d, Gpio16, Output>) -> Result<Self> {
+
         let interface = I2CDisplayInterface::new(i2c_driver);
         let mut display = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0)
             .into_buffered_graphics_mode();
@@ -33,7 +35,7 @@ impl<'d> Display<'d> {
 
         
         let text_style = Display::get_text_style();
-        Ok(Display { display , text_style})
+        Ok(Display { display , text_style, rst_pin})
     }
 
     pub fn show_message(&mut self, message: &str) -> Result<()> {

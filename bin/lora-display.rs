@@ -24,9 +24,9 @@ fn main() -> Result<()> {
     let mut peripheral_manager = PeripheralManager::new(peripherals);
 
     // Reset display first
-    if let Err(e) = DisplayFactory::reset_display_from_manager(&mut peripheral_manager) {
-        error!("Failed to reset display: {}", e);
-    }
+    // if let Err(e) = DisplayFactory::reset_display_from_manager(&mut peripheral_manager) {
+    //     error!("Failed to reset display: {}", e);
+    // }
     
     // Create display from manager
     let mut display = match DisplayFactory::create_from_manager(&mut peripheral_manager) {
