@@ -1,1 +1,2 @@
 - [ESP-MESH Protocol](https://www.mdpi.com/2071-1050/14/24/16630)
+- [IMPLEMENTAÇÃO DE REDE LORA MESH APLICADA EM SMART CITIES](https://acervodigital.ufpr.br/xmlui/bitstream/handle/1884/95187/R%20%20G%20%20MYLENA%20DE%20MORAES%20EICH.pdf?sequence=1&isAllowed=y) metodologia
