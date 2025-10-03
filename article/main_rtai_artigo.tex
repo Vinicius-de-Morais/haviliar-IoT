@@ -180,7 +180,15 @@ sumario=tradicional
     
     \subsection{Arquitetura Proposta}
     O sistema é composto por três cancelas experimentais, cada uma representada por um módulo ESP32 equipado com transceptor LoRa. Um dos dispositivos atua como \textit{gateway híbrido}, utilizando protocolo duplo, sendo TCP/IP para receber comandos do serviço web e LoRa para encaminhar a solicitação ao nó (cancela) correspondente. Os demais nós atuam como cancelas remotas, responsáveis por acionar fisicamente a saída digital que abre a cancela.
-    
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.9\linewidth]{Arquitetura.png}
+        \caption{Fluxo de operação do sistema proposto para abertura de cancelas em estacionamentos.}
+        \fonte{Elaborado pelos autores (2025).}
+        \label{fig:fluxo_sistema}
+    \end{figure}
+
     O processo de comunicação segue o fluxo:
     \begin{enumerate}
         \item O operador acessa um aplicativo móvel autenticado, seleciona a cancela desejada e envia o comando de abertura.
