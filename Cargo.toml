@@ -6,14 +6,25 @@ edition = "2021"
 resolver = "2"
 rust-version = "1.77"
 
-[workspace]
-members = [
-    ".",
-    "hal"
-]
+#[workspace]
+#members = [
+#    ".",
+#    "hal",
+#    "factory"
+#]
 
 [[bin]]
 name = "haviliar-iot"
+harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
+
+[[bin]]
+name = "display"
+path = "bin/display.rs"
+harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
+
+[[bin]]
+name = "lora-display"
+path = "bin/lora-display.rs"
 harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
 
 [profile.release]
@@ -29,18 +40,23 @@ default = []
 experimental = ["esp-idf-svc/experimental"]
 
 [dependencies]
-hal = { path = "hal" }
+#hal = { path = "hal" }
+#factory = { path = "factory" }
 log = "0.4"
-esp-idf-svc = "0.51"
+esp-idf-svc = { version = "0.51", features = ["embassy-time-driver", "embassy-sync"] }
 esp-idf-sys = { version = "0.36.1", features = ["binstart"] }
-esp-idf-hal = "0.45.2"
+esp-idf-hal = { version = "0.45.2", features = ["alloc"]}
+anyhow = "1.0.99"
+heapless = "0.9.1"
 embedded-graphics = "0.8.1"
 ssd1306 = { version = "0.10", features = ["graphics"] }
-anyhow = "1.0.99"
 embedded-hal = "1.0.0"
-heapless = "0.9.1"
-#lora-phy = { version = "3.0.1", features = ["sx127x", "lora"] }
-lora-phy = { version = "3.0.1", features = ["sx127x", "lora"] }
+embedded-hal-async = "1.0.0"
+lora-phy = { version = "3.0.1" }
+embassy-time = "0.5.0"
+alloc = { version = "0.10.5", package = "linked_list_allocator", optional = true }
+embassy-sync = "0.7.2"
+critical-section = { version = "1.1", features = ["std"], default-features = false }
 
 # --- Optional Embassy Integration ---
 # esp-idf-svc = { version = "0.51", features = ["critical-section", "embassy-time-driver", "embassy-sync"] }
