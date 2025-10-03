@@ -145,6 +145,8 @@ sumario=tradicional
 
     Diante desse contexto, este artigo propõe o desenvolvimento de um sistema de controle remoto de cancelas de estacionamento utilizando a tecnologia LoRa e o protocolo MQTT. A solução visa permitir o gerenciamento eficiente e seguro das cancelas a partir de qualquer local com acesso à internet, oferecendo uma alternativa prática, de baixo custo e escalável para aplicações urbanas.
 
+    Este trabalho busca atender a uma demanda apresentada pela empresa Estacenter, que busca uma solução de contingência para abertura de cancelas em estacionamentos inteligentes. O requisito consiste no desenvolvimento de um sistema modular e de baixo custo, capaz de operar mesmo em situações de falha de rede cabeada, utilizando conectividade via TCP/IP e LoRa.
+
     O artigo está organizado da seguinte forma: a Seção 2 descreve os fundamentos teóricos, a Seção 3 apresenta a arquitetura proposta, a Seção 4 discute os resultados e, por fim, a Seção 5 apresenta as conclusões.
 
 % A introdução deve apresentar uma visão geral do artigo, delimitando o tema e o problema a ser abordado, bem como o (s) objetivo (s) e a justificativa. O intuito é chamar a atenção do leitor para o assunto que será apresentado no artigo, sem aprofundar conceitos ou antecipar resultados. 
@@ -173,12 +175,41 @@ sumario=tradicional
     Embora o LoRaWAN tradicional adote uma topologia em estrela, pesquisas recentes indicam que sua aplicação em redes privadas pode enfrentar limitações de cobertura e confiabilidade. Nesse sentido, Huh e Kim (2019) propuseram uma versão modificada do protocolo, com suporte a redes \textit{mesh} e esquemas de múltiplo acesso para reduzir colisões de pacotes \cite{huh2019}. Em redes \textit{mesh}, cada nó pode atuar como roteador, aumentando a cobertura e permitindo rotas alternativas para transmissão de dados. Essa abordagem se mostrou eficaz em cenários como monitoramento ambiental em estaleiros e controle inteligente de iluminação pública, dispensando a necessidade de múltiplos gateways e reduzindo custos de infraestrutura.
 
 \section{Metodologia}
-        
-    Aqui deve-se descrever a metodologia utilizada no trabalho. Sugere-se a seguinte estrutura: classificação do tipo da pesquisa (quanto aos fins e quanto aos meios); descrição de onde foi feita a pesquisa (unidade de análise ou universo e amostra); informações sobre a coleta dos dados (detalhamento dos instrumentos de coleta e procedimentos utilizados) e explicações sobre como os analisou (pesquisa qualitativa e/ou quantitativa).
 
-    É importante detalhar especificamente o protocolo utilizado na coleta de dados: explique se houve realização de entrevistas ou aplicação de questionário. Cite a fonte do questionário/formulário, caso não tenha sido elaborado exclusivamente para essa pesquisa; explique quem e quantos foram os entrevistados ou pesquisados, como os escolheu, como e quando ocorreu a pesquisa. 
+    A metodologia aplicada neste trabalho compreende a modelagem da arquitetura, experimento para simular a implementação num cenário prático e por fim testes para avaliar o desempenho da solução.
+    
+    \subsection{Arquitetura Proposta}
+    O sistema é composto por três cancelas experimentais, cada uma representada por um módulo ESP32 equipado com transceptor LoRa. Um dos dispositivos atua como \textit{gateway híbrido}, utilizando protocolo duplo, sendo TCP/IP para receber comandos do serviço web e LoRa para encaminhar a solicitação ao nó (cancela) correspondente. Os demais nós atuam como cancelas remotas, responsáveis por acionar fisicamente a saída digital que abre a cancela.
+    
+    O processo de comunicação segue o fluxo:
+    \begin{enumerate}
+        \item O operador acessa um aplicativo móvel autenticado, seleciona a cancela desejada e envia o comando de abertura.
+        \item O serviço web registra o log da operação em un banco de dados e envia a requisição ao gateway.
+        \item O gateway recebe a mensagem via TCP/IP e a encaminha ao nó destino utilizando comunicação LoRa.
+        \item O nó (cancela) aciona a saída digital e retorna um \textit{feedback} ao gateway, que repassa a confirmação ao sistema.
+    \end{enumerate}
+    
+    \subsection{Dual-Protocol Networking}
+    No sistema proposto, o gateway ESP32 foi configurado para operar como uma ponte entre dois protocolos distintos: TCP/IP e LoRa. 
+    A comunicação entre o serviço web e o gateway ocorre via TCP/IP (utilizando Wi-Fi ou rede cabeada), garantindo integração com o aplicativo móvel e o banco de dados central. 
+    Já a comunicação entre o gateway e os dispositivos que representam as cancelas é realizada por meio do protocolo LoRa, permitindo baixo consumo energético e maior alcance em cenários onde a infraestrutura de rede cabeada não está disponível.
 
-    Explique se houve coleta de dados documental (acesso a documentos ou sistema de alguma empresa ou instituição), como e porque ocorreu tal coleta; explique se houve coleta de dados por observação (filmagens, por exemplo), como e porque ocorreu tal coleta; explique se houve realização de testes, experimentos ou construção de equipamentos em bancadas, laboratórios ou oficinas (como e onde ocorreu). Essa seção deve ter no máximo duas páginas.
+    \subsection{Aplicativo Móvel}
+    Foi desenvolvido um aplicativo móvel, no qual o usuário precisa realizar autenticação. Através desse aplicativo o usuário pode enviar comandos de abertura de cancela. Como o usuário está autenticado, o sistema tem controle de acesso e rastreabilidade, alinhando-se ao requisito da empresa de manter logs detalhados de operação.
+    
+    \subsection{Planejamento de Testes}
+    Inspirando-se no trabalho recente \cite{rahmatullah2025}, previmos a necessidade dos seguintes testes para avaliar a solução:
+
+    \begin{itemize}
+        \item \textbf{Taxa de sucesso de entrega de pacotes}: análise da porcentagem de mensagens corretamente recebidas entre gateway e nós.
+        \item \textbf{Atraso de transmissão (delay)}: tempo necessário entre o envio do comando pelo aplicativo e a execução na cancela.
+        \item \textbf{Vazão (throughput)}: quantidade de dados transmitidos com sucesso em um intervalo de tempo.
+        \item \textbf{Perda de pacotes (packet loss)}: proporção de pacotes perdidos em diferentes condições de distância e obstáculos.
+        \item \textbf{Jitter}: variação do atraso de comunicação, que impacta a previsibilidade do sistema.
+    \end{itemize}
+    
+    \subsection{Extensão com Comunicação Multinó}
+    Queremos avaliar a possibilidade dos nós atuarem também como retransmissores, formando uma rede LoRa em topologia \textit{mesh} simplificada. Essa abordagem busca aumentar o alcance e a confiabilidade da comunicação em cenários onde o gateway não consegue contatar diretamente determinado nó. Contudo, conforme discutido em \cite{huh2019} \cite{rahmatullah2025}, essa configuração pode introduzir conflitos de recepção entre múltiplos nós e, portanto, serão necessários ajustes como escalonamento de tempo (\textit{time slots}) ou técnicas de mitigação de colisão.
 
 % \section{Apresentação de discussão dos resultados}
 %     Nessa seção devem constar os resultados encontrados na pesquisa, visando cumprir os objetivos propostos, através da metodologia especificada na seção anterior. É facultado ao autor dividir essa seção em subseções conforme ABNT NBR 6024 (2012). 
