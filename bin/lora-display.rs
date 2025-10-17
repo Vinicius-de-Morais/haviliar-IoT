@@ -1,75 +1,83 @@
 #![no_std]
 #![no_main]
-use anyhow::Result;
+#![feature(impl_trait_in_assoc_type)]
+
 use core::fmt::Write;
-use esp_idf_hal::{
-    delay::FreeRtos, prelude::Peripherals
+use embassy_executor::Spawner;
+use embassy_time::Timer;
+use esp_backtrace as _;
+use esp_println::logger::init_logger;
+use haviliar_iot::{
+    factory::{display_factory::DisplayFactory, lora_factory::LoraFactory},
+    hal::peripheral_manager::PeripheralManagerStatic,
 };
-use esp_idf_sys as _;
 use log::*;
-use haviliar_iot::factory::display_factory::DisplayFactory;
-use haviliar_iot::factory::lora_factory::LoraFactory;
-use haviliar_iot::hal::peripheral_manager::PeripheralManager;
+use esp_hal::clock::CpuClock;
 
-#[no_mangle]
-fn main() -> Result<()> {
-    // Setup do logger
-    esp_idf_sys::link_patches();
-    esp_idf_svc::log::EspLogger::initialize_default();
+esp_bootloader_esp_idf::esp_app_desc!();
 
-    info!("Inicializando...");
+#[esp_hal_embassy::main]
+async fn main(_spawner: Spawner) {
+    init_logger(log::LevelFilter::Info);
 
-    // Initialize peripheral manager - much cleaner approach!
-    let peripherals = Peripherals::take().unwrap();
-    let mut peripheral_manager = PeripheralManager::new(peripherals);
-
-    // Reset display first
-    // if let Err(e) = DisplayFactory::reset_display_from_manager(&mut peripheral_manager) {
-    //     error!("Failed to reset display: {}", e);
-    // }
+    haviliar_iot::init_heap(); // Initialize the heap
+    info!("haviliar_iot::init_heap() called");
     
-    // Create display from manager
-    let mut display = match DisplayFactory::create_from_manager(&mut peripheral_manager) {
+    info!("Initializing ESP32 Display...");
+
+    let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
+    let peripheral_manager = PeripheralManagerStatic::init(peripherals);
+
+    let time_per =  peripheral_manager.time_per();
+    esp_hal_embassy::init(time_per.timer0);
+
+    // Create display
+    let display_peripherals = peripheral_manager.take_display_peripherals().unwrap();
+    let mut display = match DisplayFactory::create_from_peripherals(display_peripherals) {
         Ok(display) => display,
         Err(e) => {
             error!("Failed to create display: {}", e);
-            return Err(anyhow::anyhow!("Display initialization failed"));
+            panic!("Display initialization failed");
         }
     };
 
-    // Create LoRa components from manager
-    let (_lora_spi_driver, _lora_dio1, _lora_rst) = match LoraFactory::create_from_manager(&mut peripheral_manager) {
-        Ok(components) => components,
+    info!("Initializing ESP32 LoRa...");
+
+    // Create LoRa
+    let lora_peripherals = peripheral_manager.take_lora_peripherals().unwrap();
+
+    let mut lora = match LoraFactory::create_lora_with_spi(lora_peripherals).await {
+        Ok(lora) => lora,
         Err(e) => {
-            error!("Failed to create LoRa components: {:?}", e);
-            return Err(e);
+            error!("Failed to initialize LoRa: {:?}", e);
+            panic!("LoRa initialization failed");
         }
     };
 
     info!("Both display and LoRa initialized successfully!");
 
-    if let Err(e) = display.show_message("Iniciando") {
+    if let Err(e) = display.show_message("LoRa + Display OK!") {
         error!("Failed to show initial message: {:?}", e);
     }
-    FreeRtos::delay_ms(2000);
-
-    // Loop principal
-    let mut counter = 0;
+    
+    // Main loop
+    let mut counter = 0u32;
     loop {
         if let Err(e) = display.clear() {
             error!("Failed to clear display: {:?}", e);
             continue;
         }
 
-        // Texto estático
-        if let Err(e) = display.text_new_line("Display + LoRa OK!", 1) {
+        // Static text
+        if let Err(e) = display.text_new_line("LoRa + Display OK!", 1) {
             error!("Failed to write text: {:?}", e);
         }
+        
         if let Err(e) = display.text_new_line("Contador:", 2) {
             error!("Failed to write text: {:?}", e);
         }
 
-        // Contador
+        // Counter
         let mut counter_str = heapless::String::<10>::new();
         write!(&mut counter_str, "{}", counter).unwrap();
         
@@ -79,10 +87,19 @@ fn main() -> Result<()> {
         
         if let Err(e) = display.flush() {
             error!("Failed to flush display: {:?}", e);
-        }        
-        info!("Contador: {}", counter);
+        }
+
+        // Try to send LoRa message
+        let message = b"Hello LoRa!";
+        if let Err(e) = lora.send(message).await {
+            error!("Failed to send LoRa message: {:?}", e);
+        } else {
+            info!("LoRa message sent successfully");
+        }
+        
+        info!("Counter: {}", counter);
         counter += 1;
         
-        FreeRtos::delay_ms(1000);
+        Timer::after_millis(5000).await;
     }
 }

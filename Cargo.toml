@@ -13,9 +13,9 @@ rust-version = "1.77"
 #    "factory"
 #]
 
-[[bin]]
-name = "haviliar-iot"
-harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
+#[[bin]]
+#name = "haviliar-iot"
+#harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
 
 [[bin]]
 name = "display"
@@ -37,26 +37,45 @@ opt-level = "z"
 [features]
 default = []
 
-experimental = ["esp-idf-svc/experimental"]
+#experimental = ["esp-idf-svc/experimental"]
 
 [dependencies]
 #hal = { path = "hal" }
 #factory = { path = "factory" }
-log = "0.4"
-esp-idf-svc = { version = "0.51", features = ["embassy-time-driver", "embassy-sync"] }
-esp-idf-sys = { version = "0.36.1", features = ["binstart"] }
-esp-idf-hal = { version = "0.45.2", features = ["alloc"]}
-anyhow = "1.0.99"
-heapless = "0.9.1"
-embedded-graphics = "0.8.1"
-ssd1306 = { version = "0.10", features = ["graphics"] }
-embedded-hal = "1.0.0"
-embedded-hal-async = "1.0.0"
+#esp-hal = { version = "=1.0.0-beta.1", features = ["esp32", "unstable"] }
+esp-hal = { version = "=1.0.0-rc.0", features = ["esp32", "unstable"] }
+esp-hal-embassy = {version = "0.9.0", features = ["esp32"]}
+esp-backtrace = { version = "0.17.0", features = ["esp32", "panic-handler", "exception-handler", "println"] }
+esp-println = { version = "0.15.0", features = ["esp32", "log-04"] }
+
+# Embassy async runtime
+#embassy-executor = { version = "0.7.0", features = ["defmt", "nightly"] }
+embassy-executor = { version = "0.7.0", features = [ "nightly"] }
+embassy-time = { version = "0.5.0" }
+embassy-sync = { version = "0.7.2" }
+embassy-embedded-hal = { version = "0.5.0", features = ["defmt"] }
+
+# Display dependencies
+ssd1306 = "0.10.0"
+embedded-graphics = "0.8"
+
+# LoRa dependencies
 lora-phy = { version = "3.0.1" }
-embassy-time = "0.5.0"
-alloc = { version = "0.10.5", package = "linked_list_allocator", optional = true }
-embassy-sync = "0.7.2"
-critical-section = { version = "1.1", features = ["std"], default-features = false }
+
+# Embedded HAL async support
+embedded-hal-async = "1.0"
+embedded-hal = "1.0"
+
+# Utilities
+anyhow = { version = "1.0", default-features = false }
+heapless = "0.9.1"
+linked_list_allocator = "0.10"
+log = "0.4"
+fugit = "0.3"
+static_cell = "2.1.1"
+#defmt-test = "0.4.0"
+esp-alloc = "0.8.0"
+esp-bootloader-esp-idf = { version = "0.2.0", features = ["esp32"] }
 
 # --- Optional Embassy Integration ---
 # esp-idf-svc = { version = "0.51", features = ["critical-section", "embassy-time-driver", "embassy-sync"] }
@@ -80,8 +99,10 @@ embuild = "0.33"
 
 
 [build]
-target = "xtensa-esp32-espidf"
+target = "xtensa-esp32-none-elf"
 
-[target.xtensa-esp32-espidf]
-linker = "ldproxy"
+[target.xtensa-esp32-none-elf]
 runner = "espflash flash --monitor"
+
+[unstable]
+build-std = ["core", "alloc"]

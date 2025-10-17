@@ -1,124 +1,132 @@
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use esp_idf_hal::{
-    gpio::{Gpio4, Gpio8, Gpio9, Gpio10, Gpio11, Gpio12, Gpio14, Gpio15, Gpio16},
-    i2c::I2C0,
-    peripherals::Peripherals,
-    spi::SPI2,
-};
-use log::warn;
+use esp_hal::peripherals::{Peripherals, I2C0, SPI2, GPIO4, GPIO8, GPIO9, GPIO10, GPIO11, GPIO12, GPIO14, GPIO15, GPIO16, TIMG0};
+use esp_hal::timer::timg::TimerGroup;
 use core::cell::RefCell;
+use core::option::Option;
+use core::option::Option::Some;
+use core::sync::atomic::{AtomicBool, Ordering};
+use core::cell::UnsafeCell;
 
 /// Structured container for display peripherals
-pub struct DisplayPeripherals {
-    pub i2c: I2C0,
-    pub sda: Gpio4,
-    pub scl: Gpio15,
-    pub rst: Gpio16,
+pub struct DisplayPeripherals{
+    pub i2c: I2C0<'static>,
+    pub sda: GPIO4<'static>,
+    pub scl: GPIO15<'static>,
+    pub rst: GPIO16<'static>,
 }
 
 /// Structured container for LoRa peripherals
 pub struct LoRaPeripherals {
-    pub spi: SPI2,
-    pub sclk: Gpio9,
-    pub sdo: Gpio11,
-    pub sdi: Gpio10, 
-    pub cs: Gpio8,
-    pub dio1: Gpio14,
-    pub rst: Gpio12,
+    pub spi: SPI2<'static>,
+    pub sclk: GPIO9<'static>,
+    pub mosi: GPIO11<'static>,
+    pub miso: GPIO10<'static>,
+    pub cs: GPIO8<'static>,
+    pub dio1: GPIO14<'static>,
+    pub rst: GPIO12<'static>,
 }
 
-/// Centralized peripheral manager that owns all hardware peripherals
-/// and provides controlled access to them through functional groups
+/// Centralized peripheral manager
 pub struct PeripheralManager {
-    // Display peripherals wrapped in mutex with interior mutability
     display_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<DisplayPeripherals>>>,
-    
-    // LoRa peripherals wrapped in mutex with interior mutability
     lora_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<LoRaPeripherals>>>,
+    time_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<TIMG0<'static>>>>,
 }
 
 impl PeripheralManager {
-    /// Initialize the peripheral manager with all ESP32 peripherals
     pub fn new(peripherals: Peripherals) -> Self {
-        // Create display peripherals
         let display_peripherals = DisplayPeripherals {
-            i2c: peripherals.i2c0,
-            sda: peripherals.pins.gpio4,
-            scl: peripherals.pins.gpio15,
-            rst: peripherals.pins.gpio16,
+            i2c: peripherals.I2C0,
+            sda: peripherals.GPIO4,
+            scl: peripherals.GPIO15,
+            rst: peripherals.GPIO16,
         };
         
-        // Create LoRa peripherals
         let lora_peripherals = LoRaPeripherals {
-            spi: peripherals.spi2,
-            sclk: peripherals.pins.gpio9,
-            sdo: peripherals.pins.gpio11,
-            sdi: peripherals.pins.gpio10,
-            cs: peripherals.pins.gpio8,
-            dio1: peripherals.pins.gpio14,
-            rst: peripherals.pins.gpio12,
+            spi: peripherals.SPI2,
+            sclk: peripherals.GPIO9,
+            mosi: peripherals.GPIO11,
+            miso: peripherals.GPIO10,
+            cs: peripherals.GPIO8,
+            dio1: peripherals.GPIO14,
+            rst: peripherals.GPIO12,
         };
         
         Self {
             display_peripherals: Mutex::new(RefCell::new(Some(display_peripherals))),
             lora_peripherals: Mutex::new(RefCell::new(Some(lora_peripherals))),
+            time_peripherals: Mutex::new(RefCell::new(Some(peripherals.TIMG0))),
         }
     }
 
-    /// Get display peripherals (thread-safe)
-    /// Returns None if already taken, or provides temporary access while holding the lock
-    pub fn with_display_peripherals<F, R>(&self, f: F) -> Option<R>
-    where
-        F: FnOnce(&mut DisplayPeripherals) -> R,
-    {
-        self.display_peripherals.lock(|cell| {
-            if let Some(ref mut peripherals) = *cell.borrow_mut() {
-                Some(f(peripherals))
-            } else {
-                None
-            }
-        })
-    }
-
-    /// Get LoRa peripherals (thread-safe)
-    /// Returns None if already taken, or provides temporary access while holding the lock
-    pub fn with_lora_peripherals<F, R>(&self, f: F) -> Option<R>
-    where
-        F: FnOnce(&mut LoRaPeripherals) -> R,
-    {
-        self.lora_peripherals.lock(|cell| {
-            if let Some(ref mut peripherals) = *cell.borrow_mut() {
-                Some(f(peripherals))
-            } else {
-                None
-            }
-        })
-    }
-
-    /// Take display peripherals (legacy method, maintains backward compatibility)
-    /// Returns a structured container with all required peripherals
     pub fn take_display_peripherals(&self) -> Option<DisplayPeripherals> {
         self.display_peripherals.lock(|cell| {
             cell.borrow_mut().take()
         })
     }
 
-    /// Take LoRa peripherals (legacy method, maintains backward compatibility)
-    /// Returns a structured container with all required peripherals
     pub fn take_lora_peripherals(&self) -> Option<LoRaPeripherals> {
         self.lora_peripherals.lock(|cell| {
             cell.borrow_mut().take()
         })
     }
 
-    /// Check if display peripherals are available
-    pub fn has_display_peripherals(&self) -> bool {
-        self.display_peripherals.lock(|cell| cell.borrow().is_some())
+    pub fn take_time_peripherals(&self) -> Option<TIMG0> {
+        self.time_peripherals.lock(|cell| {
+            cell.borrow_mut().take()
+        })
     }
 
-    /// Check if LoRa peripherals are available
-    pub fn has_lora_peripherals(&self) -> bool {
-        self.lora_peripherals.lock(|cell| cell.borrow().is_some())
+    //pub fn time_per(peripheral_manager: &mut  PeripheralManager) -> Result<TIMG0, anyhow::Error> {
+    pub fn time_per(&self) -> TimerGroup<'_, TIMG0> {
+        // let time_per = self.take_time_peripherals()
+        //     .ok_or_else(|| anyhow::anyhow!("Time peripherals already taken"));
+        let time_per = self.take_time_peripherals().unwrap();
+        
+        TimerGroup::new(time_per)
+    }
+
+    
+}
+
+
+// Add this static variable
+static PERIPHERAL_MANAGER: PeripheralManagerStatic = PeripheralManagerStatic::new();
+
+// Add this struct for static management
+pub struct PeripheralManagerStatic {
+    initialized: AtomicBool,
+    manager: UnsafeCell<Option<PeripheralManager>>,
+}
+
+// Safety: We ensure single-threaded access through atomic flags
+unsafe impl Sync for PeripheralManagerStatic {}
+
+impl PeripheralManagerStatic {
+    const fn new() -> Self {
+        Self {
+            initialized: AtomicBool::new(false),
+            manager: UnsafeCell::new(None),
+        }
+    }
+
+    pub fn init(peripherals: Peripherals) -> &'static mut PeripheralManager {
+        if PERIPHERAL_MANAGER.initialized.swap(true, Ordering::Acquire) {
+            panic!("PeripheralManager already initialized");
+        }
+
+        let manager_ref = unsafe { &mut *PERIPHERAL_MANAGER.manager.get() };
+        *manager_ref = Some(PeripheralManager::new(peripherals));
+        manager_ref.as_mut().unwrap()
+    }
+
+    pub fn get() -> &'static mut PeripheralManager {
+        if !PERIPHERAL_MANAGER.initialized.load(Ordering::Acquire) {
+            panic!("PeripheralManager not initialized");
+        }
+        
+        let manager_ref = unsafe { &mut *PERIPHERAL_MANAGER.manager.get() };
+        manager_ref.as_mut().unwrap()
     }
 }
