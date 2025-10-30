@@ -680,9 +680,9 @@ dependencies = [
 
 [[package]]
 name = "esp-hal-embassy"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d000d94064c485f86adc6b02b541e2f072e03321b4f03d4303b7ff3062c7e692"
+checksum = "8be6d5d08adc5d26d8071450c76e62027906dce2795afaed76e9809e596f8e33"
 dependencies = [
  "cfg-if",
  "critical-section",

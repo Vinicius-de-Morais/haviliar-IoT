@@ -44,14 +44,16 @@ default = []
 #factory = { path = "factory" }
 #esp-hal = { version = "=1.0.0-beta.1", features = ["esp32", "unstable"] }
 esp-hal = { version = "=1.0.0-rc.0", features = ["esp32", "unstable"] }
-esp-hal-embassy = {version = "0.9.0", features = ["esp32"]}
+esp-hal-embassy = {version = "0.9.1", features = ["esp32"]}
+#esp-hal-embassy = {version = "0.7.0", features = ["esp32"]}
 esp-backtrace = { version = "0.17.0", features = ["esp32", "panic-handler", "exception-handler", "println"] }
 esp-println = { version = "0.15.0", features = ["esp32", "log-04"] }
 
 # Embassy async runtime
 #embassy-executor = { version = "0.7.0", features = ["defmt", "nightly"] }
-embassy-executor = { version = "0.7.0", features = [ "nightly"] }
+embassy-executor = { version = "0.7.0", features = [ "nightly", "task-arena-size-16384"] }
 embassy-time = { version = "0.5.0" }
+#embassy-time = { version = "0.5.0", features = ["generic-queue-64"] }
 embassy-sync = { version = "0.7.2" }
 embassy-embedded-hal = { version = "0.5.0", features = ["defmt"] }
 

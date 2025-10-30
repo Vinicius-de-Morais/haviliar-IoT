@@ -19,8 +19,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     init_logger(log::LevelFilter::Info);
-
-    haviliar_iot::init_heap(); // Initialize the heap
+    
     info!("haviliar_iot::init_heap() called");
     
     info!("Initializing ESP32 Display...");
@@ -46,7 +45,8 @@ async fn main(_spawner: Spawner) {
     // Create LoRa
     let lora_peripherals = peripheral_manager.take_lora_peripherals().unwrap();
 
-    let mut lora = match LoraFactory::create_lora_with_spi(lora_peripherals).await {
+    //  Setup ESP32
+    let mut lora = match LoraFactory::create_from_manager(lora_peripherals).await {
         Ok(lora) => lora,
         Err(e) => {
             error!("Failed to initialize LoRa: {:?}", e);
@@ -100,6 +100,21 @@ async fn main(_spawner: Spawner) {
         info!("Counter: {}", counter);
         counter += 1;
         
+        // Try to receive LoRa message
+        // let mut recv_buffer = [0u8; 256];
+        // match lora.receive(&mut recv_buffer).await {
+        //     Ok((length, status)) => {
+        //         let received_data = &recv_buffer[..length as usize];
+        //         // PacketStatus does not implement Debug, so avoid using {:?} on it.
+        //         // Log the length and the received bytes, and the runtime type name of status.
+        //         let status_type_name = core::any::type_name_of_val(&status);
+        //         info!("Received LoRa message (len {}): {:?}, status type: {}", length, received_data, status_type_name);
+        //     }
+        //     Err(e) => {
+        //         error!("Failed to receive LoRa message: {:?}", e);
+        //     }
+        // }
+
         Timer::after_millis(5000).await;
     }
 }

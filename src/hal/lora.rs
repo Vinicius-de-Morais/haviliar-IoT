@@ -2,7 +2,7 @@ use anyhow::Result;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use static_cell::StaticCell;
 use core::result::Result::Ok;
-use esp_hal::{gpio::{Input, InputConfig, Output, OutputConfig, Level}, spi::master::Spi, Async};
+use esp_hal::{gpio::{Input, InputConfig, Level, Output, OutputConfig}, spi::{master::Spi}, Async};
 use lora_phy::{
     sx127x::{Sx127x, Sx1276, Config},
     iv::GenericSx127xInterfaceVariant,
@@ -12,7 +12,7 @@ use lora_phy::{
 use embassy_time::Delay as EmbassyDelay;
 use log::*;
 use core::result::Result::Err;
-use esp_hal::peripherals::{GPIO14, GPIO12, GPIO8};
+use esp_hal::peripherals::{GPIO14, GPIO26, GPIO18};
 use core::default::Default;
 use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 
@@ -23,12 +23,11 @@ type LoRaInterface<'d> = GenericSx127xInterfaceVariant<
     Input<'d>,
 >;
 
-type MutexCriticalSectionSpiAsync = Mutex<CriticalSectionRawMutex, esp_hal::spi::master::Spi<'static, Async>>;
+pub type MutexCriticalSectionSpiAsync = Mutex<CriticalSectionRawMutex, esp_hal::spi::master::Spi<'static, Async>>;
 
-static SPI_BUS: StaticCell<MutexCriticalSectionSpiAsync> =
+pub static SPI_BUS: StaticCell<MutexCriticalSectionSpiAsync> =
     StaticCell::new();
 
-//pub struct Lora<'d, SPI: embedded_hal_async::spi::SpiDevice> {
 pub struct Lora<'d> {
     driver: LoRaPhy<Sx127x<SpiDevice<'d, CriticalSectionRawMutex, Spi<'static, Async>, Output<'d>>, LoRaInterface<'d>, Sx1276>, EmbassyDelay>,
     modulation: ModulationParams,
@@ -36,35 +35,33 @@ pub struct Lora<'d> {
     //buffer: [u8; 256],
 }
 
-//impl<'d, SPI> Lora<'d, SPI>
 impl<'d> Lora<'d>
-// where
-//     SPI: embedded_hal_async::spi::SpiDevice + 'd,
 {
     pub async fn new(
         spi: Spi<'static, Async>,
-        rst: GPIO12<'d>,
-        dio1: GPIO14<'d>,
-        nss: GPIO8<'d>,
+        rst: GPIO14<'static>,
+        dio1: GPIO26<'static>,
+        nss: GPIO18<'static>,
     ) -> Result<Self> {
 
         info!("Entrou na criacao do lora");
         let delay = EmbassyDelay;
-        
-        // Configure pins
-        let reset = Output::new(rst, esp_hal::gpio::Level::Low, esp_hal::gpio::OutputConfig::default());
-        let dio1_pin = Input::new(dio1, InputConfig::default());
+
         let nss = Output::new(nss, Level::High, OutputConfig::default());
+        let reset = Output::new(rst, Level::Low, OutputConfig::default());
+        let dio1 = Input::new(dio1, InputConfig::default());
 
         // Initialize the static SPI bus
+        info!("Creating bus");
         let spi_bus = SPI_BUS.init(Mutex::new(spi));
         let spi_device = embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice::new(spi_bus, nss);
 
 
         // Create interface
+        info!("Creating Interface");
         let interface = GenericSx127xInterfaceVariant::new(
             reset,
-            dio1_pin,
+            dio1,
             core::option::Option::None,
             core::option::Option::None,
         ).unwrap();
