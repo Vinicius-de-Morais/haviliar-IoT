@@ -1,74 +1,69 @@
 #![no_std]
 #![no_main]
-use anyhow::Result;
+#![feature(impl_trait_in_assoc_type)]
+
 use core::fmt::Write;
-use esp_idf_hal::{
-    delay::FreeRtos, prelude::Peripherals
+use embassy_executor::Spawner;
+use embassy_time::{Timer};
+use esp_backtrace as _;
+use esp_println::logger::init_logger;
+use haviliar_iot::{
+    factory::display_factory::DisplayFactory,
+    hal::peripheral_manager::{PeripheralManagerStatic},
 };
-use esp_idf_sys as _;
 use log::*;
-use haviliar_iot::{factory::display_factory::DisplayFactory, hal::peripheral_manager::PeripheralManager};
+use esp_hal::{clock::CpuClock};
 
-#[no_mangle]
-fn main() -> Result<()> {
-    // Setup do logger
-    esp_idf_sys::link_patches();
-    esp_idf_svc::log::EspLogger::initialize_default();
+esp_bootloader_esp_idf::esp_app_desc!();
 
-    info!("Inicializando...");
+#[esp_hal_embassy::main]
+async fn main(_spawner: Spawner) {
+    init_logger(log::LevelFilter::Info);
 
-    // Configuração dos periféricos
-    let peripherals = Peripherals::take().unwrap();
-    // let (i2c, sda, scl, rst_pin) = DisplayFactory::get_peripherals(peripherals);
-    // let mut rst_pin = PinDriver::output(rst_pin).unwrap();
-
-    // // Reset manual do display com timing mais longo
-    // rst_pin.set_low().unwrap();
-    // FreeRtos::delay_ms(50);  // Increased delay
-    // rst_pin.set_high().unwrap();
-    // FreeRtos::delay_ms(50);  // Add delay after reset
+    haviliar_iot::init_heap(); // Initialize the heap
+    info!("haviliar_iot::init_heap() called");
     
-    // let i2c = DisplayFactory::create_i2c_driver(i2c, sda, scl);
-    // let mut display = DisplayFactory::create_from_i2c(i2c);
-    
-    let mut peripheral_manager = PeripheralManager::new(peripherals);
+    info!("Initializing ESP32 with embassy...");
 
-    // Reset display first
-    // if let Err(e) = DisplayFactory::reset_display_from_manager(&mut peripheral_manager) {
-    //     error!("Failed to reset display: {}", e);
-    // }
-    
-    // Create display from manager
-    let mut display = match DisplayFactory::create_from_manager(&mut peripheral_manager) {
+    let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
+    let peripheral_manager = PeripheralManagerStatic::init(peripherals);
+
+    let time_per =  peripheral_manager.time_per();
+    esp_hal_embassy::init(time_per.timer0);
+
+    // Create display
+    let display_peripherals = peripheral_manager.take_display_peripherals().unwrap();
+    let mut display = match DisplayFactory::create_from_peripherals(display_peripherals) {
         Ok(display) => display,
         Err(e) => {
             error!("Failed to create display: {}", e);
-            return Err(anyhow::anyhow!("Display initialization failed"));
+            panic!("Display initialization failed");
         }
-    };    
+    };
 
+    // Show initial message
     if let Err(e) = display.show_message("Iniciando") {
         error!("Failed to show initial message: {:?}", e);
     }
-    FreeRtos::delay_ms(2000);
-
-    // Loop principal
-    let mut counter = 0;
+    
+    // Main loop
+    let mut counter = 0u32;
     loop {
         if let Err(e) = display.clear() {
             error!("Failed to clear display: {:?}", e);
             continue;
         }
 
-        // // Texto estático
-        if let Err(e) = display.text_new_line("Display OK! Com Factory", 1) {
+        // Static text
+        if let Err(e) = display.text_new_line("Display OK! Embassy", 1) {
             error!("Failed to write text: {:?}", e);
         }
+        
         if let Err(e) = display.text_new_line("Contador:", 2) {
             error!("Failed to write text: {:?}", e);
         }
 
-        // // Contador
+        // Counter
         let mut counter_str = heapless::String::<10>::new();
         write!(&mut counter_str, "{}", counter).unwrap();
         
@@ -78,10 +73,11 @@ fn main() -> Result<()> {
         
         if let Err(e) = display.flush() {
             error!("Failed to flush display: {:?}", e);
-        }        
-        info!("Contador: {}", counter);
+        }
+        
+        info!("Counter: {}", counter);
         counter += 1;
         
-        FreeRtos::delay_ms(1000);
+        Timer::after_millis(1000).await;
     }
 }

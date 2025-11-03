@@ -1,65 +1,72 @@
-use core::borrow::Borrow;
 use anyhow::Result;
-use esp_idf_hal::gpio::{Input, Output, PinDriver};
-use esp_idf_hal::peripheral::Peripheral;
-use esp_idf_hal::spi::{SpiDeviceDriver};
-use lora_phy::sx127x::{Sx127x, Sx1276, Config};
-use lora_phy::iv::{GenericSx127xInterfaceVariant};
-use lora_phy::mod_params::{Bandwidth, CodingRate, ModulationParams, PacketParams, RadioError, SpreadingFactor};
-use lora_phy::{LoRa, RxMode};
-use embassy_time::Delay;
-use esp_idf_hal::spi::SpiDriver as hal_SpiDriver;
-use super::spi_adapter::AsyncSpiAdapter;
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
+use static_cell::StaticCell;
+use core::result::Result::Ok;
+use esp_hal::{gpio::{Input, InputConfig, Level, Output, OutputConfig}, spi::{master::Spi}, Async};
+use lora_phy::{
+    sx127x::{Sx127x, Sx1276, Config},
+    iv::GenericSx127xInterfaceVariant,
+    mod_params::{Bandwidth, CodingRate, ModulationParams, PacketParams, RadioError, SpreadingFactor},
+    LoRa as LoRaPhy, RxMode,
+};
+use embassy_time::Delay as EmbassyDelay;
 use log::*;
-
+use core::result::Result::Err;
+use esp_hal::peripherals::{GPIO14, GPIO26, GPIO18};
+use core::default::Default;
+use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 
 const LORA_FREQUENCY_IN_HZ: u32 = 903_900_000;
 
-type GenericInterface<'d> =
-    GenericSx127xInterfaceVariant<
-        PinDriver<'d, esp_idf_hal::gpio::Gpio12, Output>,
-        PinDriver<'d, esp_idf_hal::gpio::Gpio14, Input>
-    >;
+type LoRaInterface<'d> = GenericSx127xInterfaceVariant<
+    Output<'d>,
+    Input<'d>,
+>;
 
-// Modified to use our adapter
-type SpiDriverType<'d, T> = AsyncSpiAdapter<'d, T>;
-type LoRaType<'d, T> = LoRa<Sx127x<SpiDriverType<'d, T>, GenericInterface<'d>, Sx1276>, Delay>;
+pub type MutexCriticalSectionSpiAsync = Mutex<CriticalSectionRawMutex, esp_hal::spi::master::Spi<'static, Async>>;
 
-pub struct Lora<'d, T>
-where
-    T: Borrow<hal_SpiDriver<'d>> + 'd,
-{
-    driver: LoRaType<'d, T>,
+pub static SPI_BUS: StaticCell<MutexCriticalSectionSpiAsync> =
+    StaticCell::new();
+
+pub struct Lora<'d> {
+    driver: LoRaPhy<Sx127x<SpiDevice<'d, CriticalSectionRawMutex, Spi<'static, Async>, Output<'d>>, LoRaInterface<'d>, Sx1276>, EmbassyDelay>,
     modulation: ModulationParams,
     packet_params: PacketParams,
-    buffer: [u8; 256],
+    //buffer: [u8; 256],
 }
 
-impl<'d, T> Lora<'d, T>
-where
-    T: Borrow<hal_SpiDriver<'d>> + 'd,
+impl<'d> Lora<'d>
 {
     pub async fn new(
-        spi: &'d mut SpiDeviceDriver<'d, T>,
-        dio1: impl Peripheral<P = esp_idf_hal::gpio::Gpio14> + 'd,
-        rst: impl Peripheral<P = esp_idf_hal::gpio::Gpio12> + 'd,
+        spi: Spi<'static, Async>,
+        rst: GPIO14<'static>,
+        dio1: GPIO26<'static>,
+        nss: GPIO18<'static>,
     ) -> Result<Self> {
-        let delay = Delay;
-        
-        // Create our adapter
-        let spi_adapter = AsyncSpiAdapter::new(spi);
 
-        let mut reset = PinDriver::output(rst).unwrap();
-        reset.set_high().unwrap();
-        let dio1 = PinDriver::input(dio1).unwrap();
+        info!("Entrou na criacao do lora");
+        let delay = EmbassyDelay;
 
+        let nss = Output::new(nss, Level::High, OutputConfig::default());
+        let reset = Output::new(rst, Level::Low, OutputConfig::default());
+        let dio1 = Input::new(dio1, InputConfig::default());
+
+        // Initialize the static SPI bus
+        info!("Creating bus");
+        let spi_bus = SPI_BUS.init(Mutex::new(spi));
+        let spi_device = embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice::new(spi_bus, nss);
+
+
+        // Create interface
+        info!("Creating Interface");
         let interface = GenericSx127xInterfaceVariant::new(
             reset,
             dio1,
-            None,
-            None
+            core::option::Option::None,
+            core::option::Option::None,
         ).unwrap();
 
+        // Configure radio
         let config = Config {
             chip: Sx1276,
             tcxo_used: false,
@@ -67,52 +74,56 @@ where
             rx_boost: false,
         };
 
-        let sx127x = Sx127x::new(spi_adapter, interface, config);
-        let mut driver = {
-            match lora_phy::LoRa::new(sx127x, false, delay).await {
-                Ok(d) => { d }
-                Err(err) => { info!("Radio error = {:?}", err); panic!("Radio error = {:?}", err);}
+        let sx127x = Sx127x::new(spi_device, interface, config);
+        
+        // Initialize LoRa driver
+        let mut driver = match LoRaPhy::new(sx127x, false, delay).await {
+            Ok(d) => d,
+            Err(err) => {
+                error!("LoRa initialization error: {:?}", err);
+                return Err(anyhow::anyhow!("LoRa initialization failed: {:?}", err));
             }
-        };   
+        };
+
+        let modulation = match driver.create_modulation_params(
+            SpreadingFactor::_10,
+            Bandwidth::_250KHz,
+            CodingRate::_4_8,
+            LORA_FREQUENCY_IN_HZ,
+        ) {
+            Ok(mp) => mp,
+            Err(err) => {
+                error!("Modulation params error: {:?}", err);
+                return Err(anyhow::anyhow!("Failed to create modulation params: {:?}", err));
+            }
+        };
 
         let receiving_buffer = [0u8; 256];
-        
-        let modulation =  {
-            match driver.create_modulation_params(
-                SpreadingFactor::_10,
-                Bandwidth::_250KHz,
-                CodingRate::_4_8,
-                LORA_FREQUENCY_IN_HZ,
-            ) {
-                Ok(mp) => mp,
-                Err(err) => {
-                    info!("Radio error = {:?}", err);
-                    panic!("Radio error = {:?}", err);
-                }
+        let packet_params = match driver.create_rx_packet_params(
+            4, false, receiving_buffer.len() as u8, true, false, &modulation
+        ) {
+            Ok(pp) => pp,
+            Err(err) => {
+                error!("Packet params error: {:?}", err);
+                return Err(anyhow::anyhow!("Failed to create packet params: {:?}", err));
             }
         };
 
-        let packet_params =  {
-            match driver.create_rx_packet_params(4, false, receiving_buffer.len() as u8, true, false, &modulation) {
-                Ok(pp) => pp,
-                Err(err) => {
-                    info!("Radio error = {:?}", err);
-                    panic!("Radio error = {:?}", err);
-                }
-            }
-        };
-
-        Ok(Lora { driver, modulation, packet_params, buffer: receiving_buffer })
+        Ok(Lora { 
+            driver, 
+            modulation, 
+            packet_params, 
+            //buffer: receiving_buffer 
+        })
     }
 
-    // Rest of the methods remain the same
     pub async fn send(&mut self, payload: &[u8]) -> Result<(), RadioError> {
-        let _ = self.driver.prepare_for_tx(&self.modulation, & mut self.packet_params, 17, payload).await;
+        let _ = self.driver.prepare_for_tx(&self.modulation, &mut self.packet_params, 17, payload).await;
         self.driver.tx().await
     }
 
     pub async fn receive(&mut self, buffer: &mut [u8]) -> Result<(u8, lora_phy::mod_params::PacketStatus), RadioError> {
         let _ = self.driver.prepare_for_rx(RxMode::Continuous, &self.modulation, &self.packet_params).await;
-        self.driver.rx(& mut self.packet_params, buffer).await
+        self.driver.rx(&mut self.packet_params, buffer).await
     }
 }

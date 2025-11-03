@@ -62,6 +62,8 @@ setup-linux:
 	@echo "==> Adicionando permissão de usuário para acessar porta serial"
 	sudo usermod -a -G uucp $(USER)
 	sudo usermod -a -G dialout $(USER)
+	@echo "==> install ldproxy toolchain"
+	cargo install ldproxy
 	@echo "==> Setup finalizado! Reinicie a sessão para aplicar mudanças."
 
 setup-windows:

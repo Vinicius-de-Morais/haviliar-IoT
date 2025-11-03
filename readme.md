@@ -64,23 +64,7 @@ rustup default esp
 
 ---
 
-### **3. Instalar o `cargo-generate` (opcional)**
-
-O `cargo-generate` foi utilizado apenas na **criação inicial do projeto**, para baixar o template oficial de projeto ESP32.
-
-```bash
-cargo install cargo-generate
-```
-
-Exemplo de uso:
-
-```bash
-cargo generate esp-rs/esp-idf-template
-```
-
----
-
-### **4. Corrigir problema de `libxml2` no Arch Linux**
+### **3. Corrigir problema de `libxml2` no Arch Linux**
 
 No Arch Linux, a biblioteca `libxml2` tem uma versão diferente do que o `esp-idf` espera.  
 Resolva isso criando um link simbólico:
@@ -154,7 +138,7 @@ Um `Makefile` está disponível para simplificar tarefas comuns.
 ### Compilar e rodar diretamente:
 
 ```bash
-cargo run --target xtensa-esp32-espidf
+cargo run --target xtensa-esp32-none-elf
 ```
 
 ### Gravar no ESP32:
