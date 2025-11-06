@@ -78,6 +78,7 @@ static_cell = "2.1.1"
 #defmt-test = "0.4.0"
 esp-alloc = "0.8.0"
 esp-bootloader-esp-idf = { version = "0.2.0", features = ["esp32"] }
+critical-section = "1.2.0"
 
 # --- Optional Embassy Integration ---
 # esp-idf-svc = { version = "0.51", features = ["critical-section", "embassy-time-driver", "embassy-sync"] }

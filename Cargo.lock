@@ -952,6 +952,7 @@ name = "haviliar-iot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "critical-section",
  "embassy-embedded-hal 0.5.0",
  "embassy-executor",
  "embassy-sync 0.7.2",
