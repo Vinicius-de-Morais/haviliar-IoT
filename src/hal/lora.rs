@@ -15,8 +15,11 @@ use core::result::Result::Err;
 use esp_hal::peripherals::{GPIO14, GPIO26, GPIO18};
 use core::default::Default;
 use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
+use embassy_sync::mutex::Mutex as AsyncMutex;
+
 
 const LORA_FREQUENCY_IN_HZ: u32 = 903_900_000;
+pub const PAYLOAD_LENGTH: usize = 255;
 
 type LoRaInterface<'d> = GenericSx127xInterfaceVariant<
     Output<'d>,
@@ -31,7 +34,8 @@ pub static SPI_BUS: StaticCell<MutexCriticalSectionSpiAsync> =
 pub struct Lora<'d> {
     driver: LoRaPhy<Sx127x<SpiDevice<'d, CriticalSectionRawMutex, Spi<'static, Async>, Output<'d>>, LoRaInterface<'d>, Sx1276>, EmbassyDelay>,
     modulation: ModulationParams,
-    packet_params: PacketParams,
+    rx_packet_params: PacketParams,
+    tx_packet_params: PacketParams,
     //buffer: [u8; 256],
 }
 
@@ -98,9 +102,14 @@ impl<'d> Lora<'d>
             }
         };
 
-        let receiving_buffer = [0u8; 256];
-        let packet_params = match driver.create_rx_packet_params(
-            4, false, receiving_buffer.len() as u8, true, false, &modulation
+        //let receiving_buffer = [0u8; PAYLOAD_LENGTH];
+        let rx_packet_params = match driver.create_rx_packet_params(
+            4, 
+            false, 
+            PAYLOAD_LENGTH as u8, 
+            true, 
+            false, 
+            &modulation
         ) {
             Ok(pp) => pp,
             Err(err) => {
@@ -109,21 +118,91 @@ impl<'d> Lora<'d>
             }
         };
 
+        let tx_packet_params = match driver.create_tx_packet_params(
+            4, 
+            false, 
+            true, 
+            false, 
+            &modulation
+        ){
+            Ok(pp) => pp,
+            Err(err) => {
+                error!("Packet params error: {:?}", err);
+                return Err(anyhow::anyhow!("Failed to create packet params: {:?}", err));
+            }
+        };
+
+        driver.init().await.unwrap();
+
         Ok(Lora { 
             driver, 
             modulation, 
-            packet_params, 
+            rx_packet_params, 
+            tx_packet_params,
             //buffer: receiving_buffer 
         })
     }
 
     pub async fn send(&mut self, payload: &[u8]) -> Result<(), RadioError> {
-        let _ = self.driver.prepare_for_tx(&self.modulation, &mut self.packet_params, 17, payload).await;
-        self.driver.tx().await
+        match self.driver.prepare_for_tx(&self.modulation, &mut self.tx_packet_params, 20, payload).await {
+            Ok(()) => {
+                self.driver.tx().await
+            },
+            Err(e) => {
+                error!("Failed to prepare for TX: {:?}", e);
+                return Err(e);
+            }
+        }
     }
 
     pub async fn receive(&mut self, buffer: &mut [u8]) -> Result<(u8, lora_phy::mod_params::PacketStatus), RadioError> {
-        let _ = self.driver.prepare_for_rx(RxMode::Continuous, &self.modulation, &self.packet_params).await;
-        self.driver.rx(&mut self.packet_params, buffer).await
+        match self.driver.prepare_for_rx(RxMode::Continuous, &self.modulation, &self.rx_packet_params).await {
+            Ok(()) => {
+                self.driver.rx(&mut self.rx_packet_params, buffer).await
+            },
+            Err(e) => {
+                error!("Failed to prepare for RX: {:?}", e);
+                return Err(e);
+            }
+        }
+    }
+
+    pub async fn receive_from_mutex(
+        lora: &'static AsyncMutex<CriticalSectionRawMutex, Lora<'static>>, 
+        buffer: &mut [u8]
+    ) -> Result<(u8, lora_phy::mod_params::PacketStatus), RadioError> {
+        let mut lora_ref  = lora.lock().await;
+
+        match lora_ref.receive(buffer).await {
+            Ok((length, status)) => {
+                let received_data = &buffer[..length as usize];
+
+                let status_type_name = core::any::type_name_of_val(&status);
+                info!("Received LoRa message (len {}): {:?}, status type: {}", length, received_data, status_type_name);
+
+                return Ok((length, status));
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        }
+    }
+
+
+    pub async fn send_from_mutex(
+        lora: &'static AsyncMutex<CriticalSectionRawMutex, Lora<'static>>, 
+        payload: &mut [u8]
+    ) -> Result<(), RadioError> {
+        let mut lora_ref  = lora.lock().await;
+            match lora_ref.send(&payload).await {
+                Ok(()) => {
+                    info!("LoRa message sent successfully from mutex");
+                    return Ok(());
+                }
+                Err(e) => {
+                    error!("Failed to send LoRa message from mutex: {:?}", e);
+                    return Err(e);
+                }
+            }
     }
 }
