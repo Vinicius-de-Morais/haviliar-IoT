@@ -1,251 +1,106 @@
-%% main_rtai_artigo.tex, based on abtex2-modelo-Artigo.tex, v-1.9.6 laurocesar 
-%% Adaptado por Prof. Dr. Renato Kazuo Miyamoto 
-%% Departamento de Elétrica e Automação
-%% Centro Universitário UNISENAI Londrina
-
-%% Copyright 2012-2016 by abnTeX2 group at http://www.abntex.net.br/ 
-
-% ------------------------------------------------------------------------
-% ------------------------------------------------------------------------
-% abnTeX2: Modelo de Artigo Acadêmico em conformidade com
-% ABNT NBR 6022:2003: Informação e documentação - Artigo em publicação 
-
-% ------------------------------------------------------------------------
-% ------------------------------------------------------------------------
-
 \documentclass[
-% -- opções da classe memoir --
-article,			% indica que é um artigo acadêmico
-11pt,				% tamanho da fonte
-twoside,			% para impressão apenas no recto. Oposto a twoside
-a4paper,			% tamanho do papel
-% -- opções da classe abntex2 --
-%chapter=TITLE,		% títulos de capítulos convertidos em letras maiúsculas
-section=TITLE,		% títulos de seções convertidos em letras maiúsculas
-%subsection=TITLE,	% títulos de subseções convertidos em letras maiúsculas
-%subsubsection=TITLE % títulos de subsubseções convertidos em letras maiúsculas
-% -- opções do pacote babel --
-onecolumn,          % texto em duas colunas
-english,			% idioma adicional para hifenização
-brazil,				% o último idioma é o principal do documento
+article,
+11pt,
+twoside,
+a4paper,
+section=TITLE,
+onecolumn,
+english,
+brazil,
 sumario=tradicional
 ]{abntex2}
 
-\usepackage{sty/packs}
-
-% ----
-% Se necessário, inclua outros pacotes aqui
-\usepackage[utf8]{inputenc}
-\usepackage{hyperref}
+\usepackage{lipsum}
 \usepackage{graphicx}
-\usepackage[alf]{abntex2cite}	% Citações padrão ABNT
-\usepackage{footmisc} % para melhorar formatação das notas de rodapé
-% ---
-\begin{document} 
-% ---
-% Informações de dados para CAPA e FOLHA DE ROSTO
-% ---
-% Título
-\begin{center}
-   
-    {\bfseries TÍTULO: subtítulo em língua vernácula} \\
-   
-    \vspace{0.5cm}
+\usepackage{float}
+\usepackage{microtype}
+\usepackage{indentfirst}
+\usepackage[brazilian,hyperpageref]{backref}
+\usepackage[alf]{abntex2cite}
 
-\end{center}
+\title{Solução Híbrida para Controle de Cancelas IoT com Fallback via Rede LoRa Pública}
+\author{Equipe RTAI -- UniSenai}
+\date{2025}
 
+\begin{document}
 
+\maketitle
 
-% Autores alinhados à direita
-\begin{flushright}
-    \fontsize{7}{9}\selectfont
-    Angelo Aparecido Salvador Avelino\footnotemark[1] \quad   \\
-    Gabriel Gonçalves Costa\footnotemark[2] \quad \\
-    Huan Radov Luchetti\footnotemark[3] \quad  \\
-    Lucas Vinicius de Bortoli Santos\footnotemark[4] \quad  \\
-    Pedro Antônio Frasson\footnotemark[5] \quad  \\
-    Vinicius de Morais Boim dos Santos\footnotemark[6] \quad  \\
-    Cinthya Oestreich Silva (Orientador)\footnotemark[7] \\
-\end{flushright}
-
-\vspace{1cm}
-
-% Definindo as notas de rodapé para cada autor
-\footnotetext[1]{UniSENAI PR, angeloavelino33211781@gmail.com}
-\footnotetext[2]{UniSENAI PR, gab.gabriel.1003@outlook.com)}
-\footnotetext[3]{UniSENAI PR, pafrasson@gmail.com)}
-\footnotetext[4]{UniSENAI PR, lucasbortolisantos@gmail.com)}
-\footnotetext[5]{UniSENAI PR, huan.luchetti@gmail.com)}
-\footnotetext[6]{UniSENAI PR, vinicius.santos00857469@sesisenaipr.org.br)}
-\footnotetext[7]{UniSENAI PR, cinthya.silva@docente.senai.br)}
-
-\vspace{1cm}
-
-%\local{Brasil}
-%\data{ Departamento de Engenharia Elétrica e Automação Industrial \\ Centro Universitário UniSenai PR \\ Londrina/PR - Brasil - Janeiro 2025, v-1.0}
-% ---
-
-% ----
-% Início do documento
-% ----
-
-    
-% Seleciona o idioma do documento (conforme pacotes do babel)
-%\selectlanguage{english}
-\selectlanguage{brazil}
-
-% Retira espaço extra obsoleto entre as frases.
-\frenchspacing 
-
-% ----------------------------------------------------------
-% ELEMENTOS PRÉ-TEXTUAIS
-% ----------------------------------------------------------
-
-%\twocolumn[    		% INICIO DE ARTIGO EM DUAS COLUNAS
-% página de titulo
-% \maketitle
-% resumo em português
 \begin{resumo}
-    A Internet das Coisas (IoT) tem revolucionado a forma como dispositivos e sistemas são conectados, permitindo a criação de ambientes inteligentes e integrados, como as Cidades Inteligentes. Essas cidades dependem da comunicação eficiente entre dispositivos distribuídos para otimizar recursos, melhorar a segurança e facilitar o controle remoto de infraestrutura crítica. No entanto, a conectividade remota de dispositivos físicos ainda enfrenta desafios significativos em regiões com infraestrutura de rede limitada, onde custos elevados e baixa acessibilidade dificultam a implementação de soluções eficientes. Tecnologias como LoRa, que oferecem comunicação de longo alcance com baixo consumo energético, surgem como alternativas viáveis para superar essas barreiras. Este trabalho apresenta uma solução baseada em LoRa e MQTT para o controle remoto de cancelas de estacionamento, utilizando módulos ESP32 com comunicação LoRa e um gateway que integra a rede local a um servidor MQTT. A arquitetura proposta permite que comandos sejam enviados e executados de qualquer lugar com acesso à internet, garantindo baixo custo, segurança e escalabilidade.
-
-    \noindent
-    \textbf{Palavras-chave}: IoT. LoRa. Computação de Ponta. Cidades Inteligentes.
-\end{resumo}
-    
-% resumo em inglês
-\renewcommand{\resumoname}{Abstract}
-\begin{resumo}
-    \begin{otherlanguage*}{english}
-        The Internet of Things (IoT) has revolutionized the way devices and systems are connected, enabling the creation of intelligent and integrated environments such as Smart Cities. These cities rely on efficient communication between distributed devices to optimize resources, enhance security, and facilitate remote control of critical infrastructure. However, remote connectivity of physical devices still faces significant challenges in regions with limited network infrastructure, where high costs and low accessibility hinder the implementation of effective solutions. Technologies like LoRa, which offer long-range communication with low power consumption, emerge as viable alternatives to overcome these barriers. This work presents a solution based on LoRa and MQTT for remote control of parking lot gates, using ESP32 modules with LoRa communication and a gateway that connects the local network to an MQTT server. The proposed architecture enables commands to be sent and executed from anywhere with internet access, ensuring low cost, security, and scalability.
-        
-        \noindent
-        \textbf{Keywords}: IoT. LoRa. Edge Computing. Smart Cities.
-    \end{otherlanguage*}  
+Este trabalho propõe o desenvolvimento de uma solução híbrida para controle remoto de cancelas em estacionamentos inteligentes, unindo conectividade TCP/IP, rede local e comunicação LoRa como meio de contingência. O sistema foi projetado a partir de uma demanda real da empresa Estacenter, com o objetivo de garantir operação contínua mesmo em situações de falha na rede principal, por meio do uso de infraestrutura LoRa privada e integração futura com a rede pública The Things Network (TTN). A proposta combina dispositivos ESP32, protocolo MQTT e uma arquitetura modular capaz de operar tanto em modo online quanto offline, reforçando os conceitos de resiliência e interoperabilidade aplicados à Internet das Coisas (IoT).
 \end{resumo}
 
-
-\vspace{\onelineskip}%
-
-% ----------------------------------------------------------
-% ELEMENTOS TEXTUAIS
-% ----------------------------------------------------------
 \textual
 
-% ----------------------------------------------------------
-% Introdução
-% ----------------------------------------------------------
 \section{Introdução}
-\addcontentsline{toc}{section}{Introdução}
 
-    No contexto das Smart Cities, a Internet das Coisas (IoT) tem se destacado como uma tecnologia transformadora, permitindo a interconexão de dispositivos e sistemas para otimizar processos e melhorar a eficiência. A adoção de protocolos de comunicação eficientes é crucial para o sucesso dessas aplicações, especialmente em ambientes com conectividade limitada. Nesse cenário, o protocolo LoRa (Long Range) tem emergido como uma solução promissora devido à sua capacidade de comunicação de longo alcance com baixo consumo de energia \cite{Yoon2020}.
+No contexto das Smart Cities, a Internet das Coisas (IoT) tem se destacado como uma tecnologia transformadora, permitindo a interconexão de dispositivos e sistemas para otimizar processos e melhorar a eficiência. A adoção de protocolos de comunicação eficientes é crucial para o sucesso dessas aplicações, especialmente em ambientes com conectividade limitada. Nesse cenário, o protocolo LoRa (Long Range) tem emergido como uma solução promissora devido à sua capacidade de comunicação de longo alcance com baixo consumo de energia \cite{Yoon2020}.
 
-    Para maior versatilidade na transmissão de dados, a adoção de um gateway LoRa-MQTT (Message Queuing Telemetry Transport) tem se mostrado eficaz. O gateway atua como intermediário entre os dispositivos LoRa e a nuvem, facilitando a transmissão de dados de sensores e atuadores para plataformas de análise e monitoramento em tempo real \cite{Bhawiyuga2019}.
+Para maior versatilidade na transmissão de dados, a integração com um gateway LoRa-MQTT (Message Queuing Telemetry Transport) tem se mostrado eficaz. Esse gateway atua como intermediário entre os dispositivos LoRa e a nuvem, facilitando a transmissão de dados de sensores e atuadores para plataformas de análise e monitoramento em tempo real \cite{Bhawiyuga2019}. A combinação entre LoRa e MQTT já demonstrou benefícios em áreas como agricultura de precisão e aquicultura, mas ainda há poucas explorações em cenários urbanos voltados para controle de acesso e infraestrutura inteligente.
 
-    A existência de edifícios pode interferir na comunicação LoRa, como ressalta \cite{lima2023}. Contudo, esse efeito pode ser minimizado com o uso de antenas de maior ganho e com o posicionamento estratégico dos dispositivos.
+Apesar das vantagens, a comunicação LoRa pode sofrer interferências em ambientes urbanos, especialmente devido à presença de edifícios, como ressalta \cite{lima2023}. Esses efeitos, contudo, podem ser mitigados com antenas de maior ganho e posicionamento estratégico dos dispositivos, o que reforça a importância do planejamento da rede.
 
-    Diante desse contexto, este artigo propõe o desenvolvimento de um sistema de controle remoto de cancelas de estacionamento utilizando a tecnologia LoRa e o protocolo MQTT. A solução visa permitir o gerenciamento eficiente e seguro das cancelas a partir de qualquer local com acesso à internet, oferecendo uma alternativa prática, de baixo custo e escalável para aplicações urbanas.
+Diante desse contexto, este artigo propõe o desenvolvimento de um sistema de controle remoto de cancelas de estacionamento utilizando a tecnologia LoRa em conjunto com o protocolo MQTT. A solução visa permitir o gerenciamento eficiente e seguro das cancelas a partir de qualquer local com acesso à internet, oferecendo uma alternativa prática, de baixo custo e escalável para aplicações urbanas.
 
-    O artigo está organizado da seguinte forma: a Seção 2 descreve os fundamentos teóricos, a Seção 3 apresenta a arquitetura proposta, a Seção 4 discute os resultados e, por fim, a Seção 5 apresenta as conclusões.
+O trabalho é motivado por uma demanda da empresa WebPark/Estacenter, que busca uma solução de contingência para abertura de cancelas em estacionamentos inteligentes. O requisito empresarial consiste no desenvolvimento de um sistema modular e de baixo custo, capaz de operar mesmo em situações de falha de rede cabeada, utilizando conectividade via TCP/IP, LAN local e, futuramente, 4G/5G e LoRa pública. Essa motivação prática serve como estudo de caso para aplicação das tecnologias abordadas, mantendo o foco científico na integração entre LoRa e MQTT como alternativa resiliente de comunicação.
 
-% A introdução deve apresentar uma visão geral do artigo, delimitando o tema e o problema a ser abordado, bem como o (s) objetivo (s) e a justificativa. O intuito é chamar a atenção do leitor para o assunto que será apresentado no artigo, sem aprofundar conceitos ou antecipar resultados. 
+Adicionalmente, o plano de contingência proposto faz uso da rede pública LoRa, como a The Things Network (TTN), permitindo que gateways de diferentes estacionamentos compartilhem infraestrutura e ampliem a cobertura de comunicação. Esse modelo colaborativo entre múltiplos pontos LoRa reforça a confiabilidade do sistema, possibilitando a operação remota mesmo em situações de falha na conectividade WAN.
 
-% ----------------------------------------------------------
-% Seção de explicações
-% ----------------------------------------------------------
+O artigo está organizado da seguinte forma: a Seção 2 apresenta os fundamentos teóricos; a Seção 3 descreve a metodologia e a arquitetura proposta; a Seção 4 discute os resultados experimentais; e a Seção 5 apresenta as conclusões e trabalhos futuros.
+
 \section{Fundamentação Teórica}
 
-    \subsection{Internet das Coisas (IoT)}
-    A Internet das Coisas (IoT) consiste em um ecossistema de dispositivos interconectados capazes de coletar, processar e transmitir dados em tempo real, promovendo a integração entre o mundo físico e digital \cite{lima2023}. Esse paradigma é aplicado em diversos setores, como agricultura, cidades inteligentes e monitoramento ambiental. No entanto, ainda enfrenta desafios relacionados à escalabilidade, interoperabilidade entre dispositivos e limitações de consumo energético \cite{huh2019}. Nesse contexto, soluções de conectividade de baixo custo e baixo consumo surgem como alternativas promissoras para viabilizar a expansão da IoT.
+\subsection{Internet das Coisas (IoT)}
+A Internet das Coisas (IoT) consiste em um ecossistema de dispositivos interconectados capazes de coletar, processar e transmitir dados em tempo real, promovendo a integração entre o mundo físico e digital \cite{lima2023}. Esse paradigma é aplicado em diversos setores, como agricultura, cidades inteligentes e monitoramento ambiental. No entanto, ainda enfrenta desafios relacionados à escalabilidade, interoperabilidade e consumo energético.
 
-    \subsection{LoRa}
-    O protocolo LoRa (Long Range) é uma tecnologia de comunicação sem fio da categoria LPWAN (\textit{Low Power Wide Area Network}), que se destaca por oferecer grande alcance (até 15 km em áreas abertas) aliado ao baixo consumo de energia \cite{lima2023}. A modulação utilizada é baseada em espalhamento espectral por chirp (\textit{Chirp Spread Spectrum — CSS}), que garante maior robustez contra interferências. Já o protocolo LoRaWAN atua na camada de rede, fornecendo mecanismos de autenticação, criptografia e diferentes classes de dispositivos (A, B e C), possibilitando comunicação bidirecional e segura \cite{huh2019}. Apesar de suas vantagens, o LoRaWAN apresenta limitações, como a alta taxa de colisão de pacotes em cenários com muitos dispositivos transmitindo simultaneamente.
+\subsection{LoRa e Redes Públicas}
+O protocolo LoRa (Long Range) é uma tecnologia de comunicação sem fio da categoria LPWAN, que se destaca por oferecer grande alcance (até 15 km) aliado ao baixo consumo de energia \cite{lima2023}. O LoRaWAN, camada superior do protocolo, define regras de autenticação e criptografia para comunicação segura entre dispositivos e gateways.
 
-    \subsection{MQTT}
-    O MQTT (Message Queuing Telemetry Transport) é um protocolo de comunicação leve, desenvolvido sobre TCP/IP, baseado no modelo \textit{publish-subscribe} \cite{Yoon2020}. Sua arquitetura envolve três elementos principais: \textit{publisher}, \textit{subscriber} e \textit{broker}. Esse protocolo se destaca por exigir baixa largura de banda, oferecer três níveis de Qualidade de Serviço (QoS) e garantir confiabilidade na entrega de mensagens em ambientes com restrições de energia e conectividade \cite{Bhawiyuga2019}. Devido a essas características, o MQTT é amplamente adotado em sistemas IoT que integram sensores, atuadores e plataformas em nuvem.
+A rede pública \textit{The Things Network} (TTN) representa uma iniciativa global de infraestrutura aberta para dispositivos LoRaWAN. Ela permite que diferentes usuários compartilhem gateways e ampliem o alcance da comunicação. Em sistemas como o proposto neste artigo, essa integração pode ser utilizada como canal de contingência, viabilizando a comunicação entre gateways mesmo em diferentes localidades, como múltiplos estacionamentos operados por uma mesma empresa.
 
-    \subsection{Aplicações Práticas}
-    A combinação de LoRa e MQTT tem sido explorada em diferentes contextos práticos. Na aquicultura, Bhawiyuga et al. (2019) propuseram um sistema em que sensores de pH, oxigênio dissolvido e turbidez transmitem dados via LoRa para um gateway, que os encaminha para a nuvem através do MQTT \cite{Bhawiyuga2019}. Já no contexto agrícola, Yoon et al. (2020) desenvolveram a L\&M Farm, um sistema de irrigação inteligente que coleta dados de solo e clima, utilizando LoRa para comunicação entre sensores e atuadores, enquanto o MQTT garante a integração com aplicações web para tomada de decisão \cite{Yoon2020}. Esses estudos evidenciam o potencial da integração entre ambas as tecnologias para melhorar eficiência, reduzir custos e ampliar a automação em ambientes distribuídos.
+\subsection{MQTT}
+O MQTT é um protocolo leve baseado no paradigma \textit{publish-subscribe}, ideal para aplicações IoT que demandam eficiência e confiabilidade \cite{Yoon2020}. Seu design permite comunicações assíncronas entre dispositivos, utilizando um \textit{broker} central que gerencia publicações e assinaturas de tópicos. É amplamente empregado em sistemas industriais, agrícolas e urbanos por sua baixa sobrecarga de rede e suporte a diferentes níveis de QoS.
 
-    \subsection{ESP32}
-    O microcontrolador ESP32 é amplamente utilizado em projetos IoT devido ao seu baixo custo, suporte a múltiplos protocolos de comunicação (Wi-Fi, Bluetooth e LoRa, em versões específicas), alta capacidade de processamento e baixo consumo energético \cite{lima2023}. A integração do ESP32 com módulos LoRa possibilita o desenvolvimento de protótipos de fácil implementação, capazes de transmitir dados em tempo real para plataformas de visualização e armazenamento. Testes práticos realizados por Lima (2023) demonstraram a capacidade de transmissão de dados em distâncias superiores a 10 km em ambientes abertos, ressaltando seu potencial para aplicações em áreas rurais e remotas.
-
-    \subsection{Redes Mesh com LoRa}
-    Embora o LoRaWAN tradicional adote uma topologia em estrela, pesquisas recentes indicam que sua aplicação em redes privadas pode enfrentar limitações de cobertura e confiabilidade. Nesse sentido, Huh e Kim (2019) propuseram uma versão modificada do protocolo, com suporte a redes \textit{mesh} e esquemas de múltiplo acesso para reduzir colisões de pacotes \cite{huh2019}. Em redes \textit{mesh}, cada nó pode atuar como roteador, aumentando a cobertura e permitindo rotas alternativas para transmissão de dados. Essa abordagem se mostrou eficaz em cenários como monitoramento ambiental em estaleiros e controle inteligente de iluminação pública, dispensando a necessidade de múltiplos gateways e reduzindo custos de infraestrutura.
+\subsection{Aplicações Relacionadas}
+Diversos estudos exploram a combinação de LoRa e MQTT em contextos de IoT. \cite{Bhawiyuga2019} propôs uma aplicação em aquicultura inteligente, enquanto \cite{Yoon2020} desenvolveu uma fazenda inteligente que integra sensores e atuadores com gateways LoRa-MQTT. Ambos demonstram a eficiência do modelo em cenários de conectividade limitada e baixo consumo energético. O presente trabalho expande essa abordagem para ambientes urbanos, aplicando-a no controle de cancelas e infraestrutura de estacionamento.
 
 \section{Metodologia}
-        
-    Aqui deve-se descrever a metodologia utilizada no trabalho. Sugere-se a seguinte estrutura: classificação do tipo da pesquisa (quanto aos fins e quanto aos meios); descrição de onde foi feita a pesquisa (unidade de análise ou universo e amostra); informações sobre a coleta dos dados (detalhamento dos instrumentos de coleta e procedimentos utilizados) e explicações sobre como os analisou (pesquisa qualitativa e/ou quantitativa).
 
-    É importante detalhar especificamente o protocolo utilizado na coleta de dados: explique se houve realização de entrevistas ou aplicação de questionário. Cite a fonte do questionário/formulário, caso não tenha sido elaborado exclusivamente para essa pesquisa; explique quem e quantos foram os entrevistados ou pesquisados, como os escolheu, como e quando ocorreu a pesquisa. 
+A metodologia adotada neste trabalho foi estruturada em três etapas principais: (i) modelagem da arquitetura híbrida, (ii) implementação experimental com dispositivos ESP32 e serviços Web e (iii) definição de métricas de avaliação de desempenho.
 
-    Explique se houve coleta de dados documental (acesso a documentos ou sistema de alguma empresa ou instituição), como e porque ocorreu tal coleta; explique se houve coleta de dados por observação (filmagens, por exemplo), como e porque ocorreu tal coleta; explique se houve realização de testes, experimentos ou construção de equipamentos em bancadas, laboratórios ou oficinas (como e onde ocorreu). Essa seção deve ter no máximo duas páginas.
+\subsection{Arquitetura Proposta}
+O sistema desenvolvido é composto por três cancelas experimentais, cada uma representada por um módulo ESP32 conectado à rede local. Um dos dispositivos atua como \textit{gateway principal}, utilizando conectividade TCP/IP para receber comandos do servidor e retransmiti-los aos nós locais responsáveis por acionar fisicamente as cancelas.
 
-% \section{Apresentação de discussão dos resultados}
-%     Nessa seção devem constar os resultados encontrados na pesquisa, visando cumprir os objetivos propostos, através da metodologia especificada na seção anterior. É facultado ao autor dividir essa seção em subseções conforme ABNT NBR 6024 (2012). 
-%     (Caso sua pesquisa seja uma Pesquisa Bibliográfica use como título desta seção apenas Discussão)
+O fluxo de operação é apresentado na Figura~\ref{fig:fluxo_sistema}, que representa o ciclo completo de comando, execução e confirmação.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\linewidth]{./img/Arquitetura.png}
+    \caption{Fluxo de operação do sistema proposto para abertura de cancelas em estacionamentos.}
+    \fonte{Elaborado pelos autores (2025).}
+    \label{fig:fluxo_sistema}
+\end{figure}
+
+\subsection{Dual-Protocol Gateway com Fallback LoRa}
+O gateway ESP32 foi projetado para operar como uma ponte entre dois protocolos distintos: TCP/IP e LoRa. A comunicação entre o servidor web e o gateway ocorre via internet (WAN), enquanto as cancelas são controladas via rede local. Em caso de falha da conectividade WAN, o gateway tenta restabelecer a comunicação com o servidor utilizando a rede LoRa, podendo explorar tanto gateways de outros estacionamentos da Estacenter quanto a rede pública TTN.
+
+Essa arquitetura híbrida garante operação contínua e reforça a resiliência do sistema, mesmo quando a infraestrutura principal de internet não está disponível.
+
+\subsection{Aplicativo e Interface Web}
+Foi desenvolvido um aplicativo móvel autenticado para operadores, permitindo o acionamento remoto das cancelas. O sistema registra cada operação em banco de dados, incluindo data, hora, operador e dispositivo acionado, garantindo rastreabilidade e auditoria completa. A interface web complementa o controle, permitindo gestão de múltiplos estacionamentos em tempo real.
+
+\subsection{Testes e Métricas}
+Para avaliar o desempenho do sistema, serão realizados testes de:
+\begin{itemize}
+    \item \textbf{Taxa de entrega de pacotes}: proporção de comandos recebidos com sucesso nas cancelas.
+    \item \textbf{Tempo de resposta}: latência entre o comando do operador e a execução física.
+    \item \textbf{Comutação WAN/LoRa}: tempo necessário para detecção de falha e ativação do fallback.
+    \item \textbf{Alcance e estabilidade do LoRa}: medições em diferentes distâncias e obstáculos urbanos.
+\end{itemize}
+
+Essas métricas foram inspiradas em \cite{Rahmatullah2025}, que analisou desempenho de redes multinode LoRa-MQTT em cenários de comunicação híbrida.
 
 
-
-    % ---
-    % Finaliza a parte no bookmark do PDF, para que se inicie o bookmark na raiz
-    % ---
-    \bookmarksetup{startatroot}% 
-    % ---
-    
-    % ---
-    % Conclusão
-    % ---
-    % \section{Considerações finais}
-    % \addcontentsline{toc}{section}{Considerações finais}
-    % Parte final do artigo, na qual o autor evidencia que os objetivos foram cumpridos, destaca os principais resultados obtidos e deixa sugestões para estudos futuros acerca do tema estudado.
-    
-    % Na conclusão não se utiliza citações, ilustrações e não se apresenta resultados ou conceitos novos (que não haviam sido apresentados anteriormente no texto).
-
-    
-        
-    % ----------------------------------------------------------
-    % ELEMENTOS PÓS-TEXTUAIS
-    % ----------------------------------------------------------
-    \postextual                 % Os elementos pós-textuais estão desabilitados nesse modelo
-    
-    % ----------------------------------------------------------
-    % Referências bibliográficas
-    % ----------------------------------------------------------
-    \bibliography{rtai}
-    
-    % ----------------------------------------------------------
-    % Glossário
-    % ----------------------------------------------------------
-    %\glossary
-    
-    % ----------------------------------------------------------
-    % Apêndices
-    % ----------------------------------------------------------
-    % \vspace{1cm}
-    % \begin{apendicesenv}
-        
-    %     % ----------------------------------------------------------
-    %     \chapter{Nullam elementum urna vel imperdiet sodales elit ipsum pharetra ligula
-    %         ac pretium ante justo a nulla curabitur tristique arcu eu metus}
-    %     % ----------------------------------------------------------
-    %     \lipsum[55-57]
-        
-    % \end{apendicesenv}
-    % ---
-    
-    % ----------------------------------------------------------
-    % Anexos
-    % ----------------------------------------------------------
-    % \cftinserthook{toc}{AAA}
-    % \vspace{1cm}
-    % \begin{anexosenv}
-        
-    %     % ---
-    %     \chapter{Cras non urna sed feugiat cum sociis natoque penatibus et magnis dis
-    %         parturient montes nascetur ridiculus mus}
-    %     % ---
-        
-    %     \lipsum[31]
-        
-    % \end{anexosenv}
+\postextual
+\bibliography{rtai}
 \end{document}
