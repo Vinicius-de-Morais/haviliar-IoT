@@ -1,33 +1,126 @@
+%% main_rtai_artigo.tex, based on abtex2-modelo-Artigo.tex, v-1.9.6 laurocesar 
+%% Adaptado por Prof. Dr. Renato Kazuo Miyamoto 
+%% Departamento de Elétrica e Automação
+%% Centro Universitário UNISENAI Londrina
+
+%% Copyright 2012-2016 by abnTeX2 group at http://www.abntex.net.br/ 
+
+% ------------------------------------------------------------------------
+% ------------------------------------------------------------------------
+% abnTeX2: Modelo de Artigo Acadêmico em conformidade com
+% ABNT NBR 6022:2003: Informação e documentação - Artigo em publicação 
+
+% ------------------------------------------------------------------------
+% ------------------------------------------------------------------------
+
 \documentclass[
-article,
-11pt,
-twoside,
-a4paper,
-section=TITLE,
-onecolumn,
-english,
-brazil,
+% -- opções da classe memoir --
+article,			% indica que é um artigo acadêmico
+11pt,				% tamanho da fonte
+twoside,			% para impressão apenas no recto. Oposto a twoside
+a4paper,			% tamanho do papel
+% -- opções da classe abntex2 --
+%chapter=TITLE,		% títulos de capítulos convertidos em letras maiúsculas
+section=TITLE,		% títulos de seções convertidos em letras maiúsculas
+%subsection=TITLE,	% títulos de subseções convertidos em letras maiúsculas
+%subsubsection=TITLE % títulos de subsubseções convertidos em letras maiúsculas
+% -- opções do pacote babel --
+onecolumn,          % texto em duas colunas
+english,			% idioma adicional para hifenização
+brazil,				% o último idioma é o principal do documento
 sumario=tradicional
 ]{abntex2}
 
-\usepackage{lipsum}
+\usepackage{sty/packs}
+
+% ----
+% Se necessário, inclua outros pacotes aqui
+\usepackage[utf8]{inputenc}
+\usepackage{hyperref}
 \usepackage{graphicx}
-\usepackage{float}
-\usepackage{microtype}
-\usepackage{indentfirst}
-\usepackage[brazilian,hyperpageref]{backref}
-\usepackage[alf]{abntex2cite}
+\usepackage[alf]{abntex2cite}	% Citações padrão ABNT
+\usepackage{footmisc} % para melhorar formatação das notas de rodapé
+% ---
+\begin{document} 
+% ---
+% Informações de dados para CAPA e FOLHA DE ROSTO
+% ---
+% Título
+\begin{center}
+   
+    {\bfseries TÍTULO: Solução Híbrida para Controle de Cancelas IoT com Fallback via Rede LoRa Pública} \\
+   
+    \vspace{0.5cm}
 
-\title{Solução Híbrida para Controle de Cancelas IoT com Fallback via Rede LoRa Pública}
-\author{Equipe RTAI -- UniSenai}
-\date{2025}
+\end{center}
 
-\begin{document}
 
-\maketitle
 
+% Autores alinhados à direita
+\begin{flushright}
+    \fontsize{7}{9}\selectfont
+    Angelo Aparecido Salvador Avelino\footnotemark[1] \quad   \\
+    Gabriel Gonçalves Costa\footnotemark[2] \quad \\
+    Huan Radov Luchetti\footnotemark[3] \quad  \\
+    Lucas Vinicius de Bortoli Santos\footnotemark[4] \quad  \\
+    Pedro Antônio Frasson\footnotemark[5] \quad  \\
+    Vinicius de Morais Boim dos Santos\footnotemark[6] \quad  \\
+    Cinthya Oestreich Silva (Orientador)\footnotemark[7] \\
+\end{flushright}
+
+\vspace{1cm}
+
+% Definindo as notas de rodapé para cada autor
+\footnotetext[1]{UniSENAI PR, angeloavelino33211781@gmail.com}
+\footnotetext[2]{UniSENAI PR, gab.gabriel.1003@outlook.com)}
+\footnotetext[3]{UniSENAI PR, pafrasson@gmail.com)}
+\footnotetext[4]{UniSENAI PR, lucasbortolisantos@gmail.com)}
+\footnotetext[5]{UniSENAI PR, huan.luchetti@gmail.com)}
+\footnotetext[6]{UniSENAI PR, vinicius.santos00857469@sesisenaipr.org.br)}
+\footnotetext[7]{UniSENAI PR, cinthya.silva@docente.senai.br)}
+
+\vspace{1cm}
+
+%\local{Brasil}
+%\data{ Departamento de Engenharia Elétrica e Automação Industrial \\ Centro Universitário UniSenai PR \\ Londrina/PR - Brasil - Janeiro 2025, v-1.0}
+% ---
+
+% ----
+% Início do documento
+% ----
+
+    
+% Seleciona o idioma do documento (conforme pacotes do babel)
+%\selectlanguage{english}
+\selectlanguage{brazil}
+
+% Retira espaço extra obsoleto entre as frases.
+\frenchspacing 
+
+% ----------------------------------------------------------
+% ELEMENTOS PRÉ-TEXTUAIS
+% ----------------------------------------------------------
+
+%\twocolumn[    		% INICIO DE ARTIGO EM DUAS COLUNAS
+% página de titulo
+% \maketitle
+% resumo em português
 \begin{resumo}
-Este trabalho propõe o desenvolvimento de uma solução híbrida para controle remoto de cancelas em estacionamentos inteligentes, unindo conectividade TCP/IP, rede local e comunicação LoRa como meio de contingência. O sistema foi projetado a partir de uma demanda real da empresa Estacenter, com o objetivo de garantir operação contínua mesmo em situações de falha na rede principal, por meio do uso de infraestrutura LoRa privada e integração futura com a rede pública The Things Network (TTN). A proposta combina dispositivos ESP32, protocolo MQTT e uma arquitetura modular capaz de operar tanto em modo online quanto offline, reforçando os conceitos de resiliência e interoperabilidade aplicados à Internet das Coisas (IoT).
+    Este trabalho propõe o desenvolvimento de uma solução híbrida para controle remoto de cancelas em estacionamentos inteligentes, unindo conectividade TCP/IP, rede local e comunicação LoRa como meio de contingência. O sistema foi projetado a partir de uma demanda real da empresa Estacenter, com o objetivo de garantir operação contínua mesmo em situações de falha na rede principal, por meio do uso de infraestrutura LoRa privada e integração futura com a rede pública The Things Network (TTN). A proposta combina dispositivos ESP32, protocolo MQTT e uma arquitetura modular capaz de operar tanto em modo online quanto offline, reforçando os conceitos de resiliência e interoperabilidade aplicados à Internet das Coisas (IoT).
+
+    \noindent
+    \textbf{Palavras-chave}: IoT. LoRa. Computação de Ponta. Cidades Inteligentes.
+\end{resumo}
+    
+% resumo em inglês
+\renewcommand{\resumoname}{Abstract}
+\begin{resumo}
+    \begin{otherlanguage*}{english}
+        This work proposes the development of a hybrid solution for remote control of gates in smart parking lots, combining TCP/IP connectivity, local network and LoRa communication as a contingency measure. The system was designed based on a real demand from the company Estacenter, with the aim of ensuring continuous operation even in situations of failure in the main network, through the use of private LoRa infrastructure and future integration with the public network The Things Network (TTN). The proposal combines ESP32 devices, MQTT protocol and a modular architecture capable of operating both online and offline, reinforcing the concepts of resilience and interoperability applied to the Internet of Things (IoT).
+        
+        \noindent
+        \textbf{Keywords}: IoT. LoRa. Edge Computing. Smart Cities.
+    \end{otherlanguage*}  
 \end{resumo}
 
 \textual
