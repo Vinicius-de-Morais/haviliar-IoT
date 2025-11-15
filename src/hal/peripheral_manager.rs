@@ -1,6 +1,6 @@
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use esp_hal::peripherals::{Peripherals, I2C0, SPI2, GPIO4, GPIO5, GPIO19, GPIO27, GPIO26, GPIO18, GPIO14, GPIO15, GPIO16, TIMG0};
+use esp_hal::peripherals::{Peripherals, I2C0, SPI2, GPIO4, GPIO5, GPIO19, GPIO27, GPIO26, GPIO18, GPIO14, GPIO15, GPIO16, TIMG0, TIMG1, RNG, WIFI};
 use esp_hal::timer::timg::TimerGroup;
 use core::cell::RefCell;
 use core::option::Option;
@@ -27,11 +27,18 @@ pub struct LoRaPeripherals {
     pub rst: GPIO14<'static>,
 }
 
+pub struct WifiPeripherals {
+    pub timg0: TIMG0<'static>,
+    pub rng: RNG<'static>,
+    pub wifi: WIFI<'static>,
+}
+
 /// Centralized peripheral manager
 pub struct PeripheralManager {
     display_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<DisplayPeripherals>>>,
     lora_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<LoRaPeripherals>>>,
-    time_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<TIMG0<'static>>>>,
+    wifi_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<WifiPeripherals>>>,
+    time_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<TIMG1<'static>>>>,
 }
 
 impl PeripheralManager {
@@ -52,11 +59,18 @@ impl PeripheralManager {
             dio1: peripherals.GPIO26,
             rst: peripherals.GPIO14,
         };
+
+        let wifi_peripherals = WifiPeripherals {
+            timg0: peripherals.TIMG0,
+            rng: peripherals.RNG,
+            wifi: peripherals.WIFI,
+        };
         
         Self {
             display_peripherals: Mutex::new(RefCell::new(Some(display_peripherals))),
             lora_peripherals: Mutex::new(RefCell::new(Some(lora_peripherals))),
-            time_peripherals: Mutex::new(RefCell::new(Some(peripherals.TIMG0))),
+            wifi_peripherals: Mutex::new(RefCell::new(Some(wifi_peripherals))),
+            time_peripherals: Mutex::new(RefCell::new(Some(peripherals.TIMG1))),
         }
     }
 
@@ -72,19 +86,23 @@ impl PeripheralManager {
         })
     }
 
-    pub fn take_time_peripherals(&self) -> Option<TIMG0> {
+    pub fn take_wifi_peripherals(&self) -> Option<WifiPeripherals> {
+        self.wifi_peripherals.lock(|cell| {
+            cell.borrow_mut().take()
+        })
+    }
+
+    pub fn take_time_peripherals(&self) -> Option<TIMG1> {
         self.time_peripherals.lock(|cell| {
             cell.borrow_mut().take()
         })
     }
 
-    pub fn time_per(&self) -> TimerGroup<'_, TIMG0> {
+    pub fn time_per(&self) -> TimerGroup<'_, TIMG1> {
         let time_per = self.take_time_peripherals().unwrap();
         
         TimerGroup::new(time_per)
     }
-
-    
 }
 
 
