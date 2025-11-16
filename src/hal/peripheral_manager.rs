@@ -1,6 +1,6 @@
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use esp_hal::peripherals::{Peripherals, I2C0, SPI2, GPIO4, GPIO5, GPIO19, GPIO27, GPIO26, GPIO18, GPIO14, GPIO15, GPIO16, TIMG0, TIMG1, RNG, WIFI};
+use esp_hal::peripherals::{Peripherals, I2C0, SPI2, GPIO4, GPIO5, GPIO19, GPIO27, GPIO26, GPIO18, GPIO14, GPIO15, GPIO16, GPIO12, TIMG0, TIMG1, RNG, WIFI, LEDC};
 use esp_hal::timer::timg::TimerGroup;
 use core::cell::RefCell;
 use core::option::Option;
@@ -33,12 +33,19 @@ pub struct WifiPeripherals {
     pub wifi: WIFI<'static>,
 }
 
+pub struct ServoPeripherals {
+    //pub pin: GPIO17<'static>,
+    pub pin: GPIO12<'static>,
+    pub ledc: LEDC<'static>,
+}
+
 /// Centralized peripheral manager
 pub struct PeripheralManager {
     display_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<DisplayPeripherals>>>,
     lora_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<LoRaPeripherals>>>,
     wifi_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<WifiPeripherals>>>,
     time_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<TIMG1<'static>>>>,
+    servo_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<ServoPeripherals>>>,
 }
 
 impl PeripheralManager {
@@ -65,12 +72,19 @@ impl PeripheralManager {
             rng: peripherals.RNG,
             wifi: peripherals.WIFI,
         };
+
+        let servo_peripherals = ServoPeripherals {
+            //pin: peripherals.GPIO17,
+            pin: peripherals.GPIO12,
+            ledc: peripherals.LEDC,
+        };
         
         Self {
             display_peripherals: Mutex::new(RefCell::new(Some(display_peripherals))),
             lora_peripherals: Mutex::new(RefCell::new(Some(lora_peripherals))),
             wifi_peripherals: Mutex::new(RefCell::new(Some(wifi_peripherals))),
             time_peripherals: Mutex::new(RefCell::new(Some(peripherals.TIMG1))),
+            servo_peripherals: Mutex::new(RefCell::new(Some(servo_peripherals))),
         }
     }
 
@@ -88,6 +102,12 @@ impl PeripheralManager {
 
     pub fn take_wifi_peripherals(&self) -> Option<WifiPeripherals> {
         self.wifi_peripherals.lock(|cell| {
+            cell.borrow_mut().take()
+        })
+    }
+
+    pub fn take_servo_peripherals(&self) -> Option<ServoPeripherals> {
+        self.servo_peripherals.lock(|cell| {
             cell.borrow_mut().take()
         })
     }
