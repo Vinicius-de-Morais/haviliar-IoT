@@ -2,53 +2,39 @@
 #![no_main]
 #![feature(impl_trait_in_assoc_type)]
 
-use core::{fmt::Write, task::Context};
 use embassy_executor::Spawner;
-use embassy_sync::{blocking_mutex::{CriticalSectionMutex, Mutex, raw::CriticalSectionRawMutex}, channel::{Channel, Sender}, mutex::Mutex as AsyncMutex};
+use embassy_sync::{blocking_mutex::{raw::CriticalSectionRawMutex}, channel::{Channel, Receiver}};
 use embassy_time::Timer;
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
 use haviliar_iot::{
-    factory::{display_factory::DisplayFactory, lora_factory::LoraFactory},
-    hal::{display::Display, lora::{Lora, PAYLOAD_LENGTH}, peripheral_manager::PeripheralManagerStatic, wifi::Wifi},
+    hal::{peripheral_manager::PeripheralManagerStatic, servo_motor::ServoMotor, wifi::Wifi},
 };
 use log::*;
-use esp_hal::clock::CpuClock;
+use esp_hal::{clock::CpuClock};
 use static_cell::StaticCell;
-
-// peripherals-related imports
 use esp_alloc as _;
-use esp_hal::{
-    i2c::master::{Config, I2c},
-    rng::Rng,
-    timer::timg::TimerGroup,
-};
-
 use esp_wifi::{
-    EspWifiController, init, wifi::{self, ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState}
+    wifi::{ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState}
 };
-
-// embassy related imports
 use embassy_net::{
     tcp::TcpSocket,
-    Runner,
-    {dns::DnsQueryType, Config as EmbassyNetConfig, StackResources},
+    Runner
 };
 use embassy_time::{Duration};
-
-// MQTT related imports
 use rust_mqtt::{
     client::{client::MqttClient, client_config::ClientConfig},
-    packet::v5::reason_codes::ReasonCode,
     utils::rng_generator::CountingRng,
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 //static WIFI: StaticCell<AsyncMutex<CriticalSectionRawMutex, Wifi>> = StaticCell::new();
-static WIFI: StaticCell<Wifi> = StaticCell::new();
-static WIFI_CONTROLLER: StaticCell<WifiController<'static>> = StaticCell::new();
-static WIFI_RUNNER: StaticCell<Runner<'static, WifiDevice<'static>>> = StaticCell::new();
+//static WIFI: StaticCell<Wifi> = StaticCell::new();
+//static WIFI_CONTROLLER: StaticCell<WifiController<'static>> = StaticCell::new();
+//static WIFI_RUNNER: StaticCell<Runner<'static, WifiDevice<'static>>> = StaticCell::new();
+static SERVO_CHANNEL: StaticCell<Channel<CriticalSectionRawMutex, i16, 4>> = StaticCell::new();
+
 
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>, ssid: &'static str, password: &'static str) {
@@ -94,6 +80,44 @@ async fn connection(mut controller: WifiController<'static>, ssid: &'static str,
 #[embassy_executor::task]
 async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
     runner.run().await
+}
+
+#[embassy_executor::task]
+async fn servo_task(receiver: Receiver<'static, CriticalSectionRawMutex, i16, 4>, mut servo: ServoMotor) {
+    
+    info!("Servo task started");
+    // Small async test sequence (await-able)
+    info!("Running quick GPIO17 (LEDC) test...");
+    for i in 0..3 {
+
+        info!("Test cycle {}: MIN_DUTY", i);
+        servo.set_angle(255);
+        Timer::after(Duration::from_millis(400)).await;
+        
+        info!("Test cycle {}: MAX_DUTY", i);
+        servo.set_angle(0);
+        Timer::after(Duration::from_millis(400)).await;
+    }
+    info!("GPIO17 (LEDC) test finished. If servo doesn't move, check wiring/power.");
+
+
+    loop {
+        match receiver.try_receive() {
+            Ok(message) => {
+                let angle = message;
+                info!("Servo requested angle: {}", angle);
+        
+                servo.set_angle(angle);
+        
+                info!("Servo set to angle: {}", angle);
+                Timer::after(Duration::from_millis(10)).await;
+            }
+            Err(e) => {
+                error!("Failed to receive from Channel: {:?}", e);
+            }
+        }
+        Timer::after(Duration::from_millis(600)).await;
+    }
 }
 
 use core::mem::MaybeUninit;
@@ -151,8 +175,20 @@ async fn main(_spawner: Spawner) {
     let mut rx_buffer = [0; 4096];
     let mut tx_buffer = [0; 4096];
 
+
+    // INICIAR SERVO MOTOR
+    info!("Initializing Servo Motor...");
+    let servo_peripherals = peripheral_manager.take_servo_peripherals().unwrap();
+    let servo_motor = ServoMotor::new(servo_peripherals);
+
+    
+    // Spawn a task que controla o servo
+    let channel = SERVO_CHANNEL.init(Channel::new());
+    let sender = channel.sender();
+    let receiver = channel.receiver();
+    let _ = _spawner.spawn(servo_task(receiver, servo_motor));
+
     // Main loop
-    let mut counter = 0u32;
     loop {
         // Verificar se ainda temos IP antes de tentar conectar
         if stack.config_v4().is_none() {
@@ -165,11 +201,10 @@ async fn main(_spawner: Spawner) {
         info!("Current IP: {} | Gateway: {:?}", config.address, config.gateway);
 
         let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
-        socket.set_timeout(Some(embassy_time::Duration::from_secs(60))); // Aumentar timeout
-        socket.set_keep_alive(Some(embassy_time::Duration::from_secs(30))); // Adicionar keep-alive
+        socket.set_timeout(Some(embassy_time::Duration::from_secs(60))); 
+        socket.set_keep_alive(Some(embassy_time::Duration::from_secs(30)));
 
-        // Alternativa: Usar DNS para broker público (apenas teste)
-        // info!("Resolving DNS for test.mosquitto.org...");
+
         // let address = match stack
         //     .dns_query("test.mosquitto.org", DnsQueryType::A)
         //     .await
@@ -186,7 +221,7 @@ async fn main(_spawner: Spawner) {
         //     }
         // };
         // Use WSL eth0 IP address - check with: ip addr show eth0
-        let address = embassy_net::Ipv4Address::new(172, 24, 180, 80);
+        let address = embassy_net::Ipv4Address::new(192, 168, 1, 21);
 
         let remote_endpoint = (address, 1883);
         info!("Connecting to {:?}...", remote_endpoint);
@@ -216,11 +251,11 @@ async fn main(_spawner: Spawner) {
         );
         config.add_max_subscribe_qos(rust_mqtt::packet::v5::publish_packet::QualityOfService::QoS1);
         config.add_client_id("esp32-haviliar");
-        config.max_packet_size = 512;
+        config.max_packet_size = 255;
         config.keep_alive = 60; // Keep connection alive for 60 seconds
         
         let mut client =
-            MqttClient::<_, 5, _>::new(socket, &mut write_buffer, 512, &mut recv_buffer, 512, config);
+            MqttClient::<_, 5, _>::new(socket, &mut write_buffer, 255, &mut recv_buffer, 255, config);
 
         info!("Connecting to MQTT broker...");
         info!("Attempting MQTT handshake with broker at {:?}...", remote_endpoint);
@@ -231,10 +266,6 @@ async fn main(_spawner: Spawner) {
             }
             Err(mqtt_error) => {
                 error!("MQTT connect error: {:?}", mqtt_error);
-                error!("This could be due to:");
-                error!("  1. Broker doesn't support MQTT v5");
-                error!("  2. Firewall blocking the connection");
-                error!("  3. Broker configuration issue");
                 error!("Waiting 5s before retrying...");
                 Timer::after(Duration::from_secs(5)).await;
                 continue;
@@ -242,20 +273,68 @@ async fn main(_spawner: Spawner) {
         }
         
         info!("Publishing message to 'esp32/test'...");
-        match client
-            .send_message(
-                "esp32/test",
-                b"Hello from ESP32!",
-                rust_mqtt::packet::v5::publish_packet::QualityOfService::QoS1,
-                true,
-            )
-            .await
-        {
+        // match client
+        //     .send_message(
+        //         "esp32/test",
+        //         b"Hello from ESP32!",
+        //         rust_mqtt::packet::v5::publish_packet::QualityOfService::QoS1,
+        //         true,
+        //     )
+        //     .await
+        // {
+        //     Ok(()) => {
+        //         info!("✓ Message published successfully!");
+        //     }
+        //     Err(mqtt_error) => {
+        //         error!("Publish error: {:?}", mqtt_error);
+        //     }
+        // }
+
+        match client.subscribe_to_topic("esp32/open").await {
             Ok(()) => {
-                info!("✓ Message published successfully!");
+                info!("✓ Subscribed to topic 'esp32/test' successfully!");
             }
             Err(mqtt_error) => {
-                error!("Publish error: {:?}", mqtt_error);
+                error!("Subscribe error: {:?}", mqtt_error);
+            }
+        }
+
+        // Process incoming messages for a short duration
+        let start_time = embassy_time::Instant::now();
+        let processing_duration = Duration::from_secs(10); // Process messages for 10 seconds
+        loop {
+            if embassy_time::Instant::now() - start_time > processing_duration {
+                info!("Finished processing incoming messages.");
+                break;
+            }
+
+            match client.receive_message().await {
+                Ok((topic, payload)) => {
+                    // info!(
+                    //     "Received message on topic '{}': {}",
+                    //     topic,
+                    //     core::str::from_utf8(&payload).unwrap_or("<invalid utf8>")
+                    // );
+                    let msg = core::str::from_utf8(&payload).unwrap_or("<invalid utf8>");
+                    info!("Received message on topic '{}': {}", topic, msg);
+
+                    // Tentar parsear como inteiro (ângulo)
+                    if let Ok(angle) = msg.trim().parse::<i16>() {
+                        // limitar faixa (0..=180)
+                        let angle = angle.clamp(0, 180);
+                        info!("Setting servo angle to: {}", angle);
+                        match sender.try_send(angle) {
+                            Ok(_) => info!("Sent angle to servo task"),
+                            Err(e) => error!("Failed to send angle to servo task: {:?}", e),
+                        }                         
+                    } else {
+                        info!("Payload não é um inteiro válido para ângulo: '{}'", msg);
+                    }
+                }
+                Err(mqtt_error) => {
+                    error!("Receive message error: {:?}", mqtt_error);
+                    break;
+                }
             }
         }
 

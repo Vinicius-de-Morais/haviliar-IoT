@@ -16,6 +16,6 @@ build-std = ["core", "alloc"]
 
 [env]
 MCU="esp32"
-SSID="ERROR 404"
-PASSWORD="T0PZ3R44"
+SSID="RICARDO"
+PASSWORD="amopapaiemamae5170"
 
