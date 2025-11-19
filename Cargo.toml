@@ -32,6 +32,11 @@ name = "wifi"
 path = "bin/wifi.rs"
 harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
 
+[[bin]]
+name = "teste"
+path = "bin/teste.rs"
+harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
+
 [profile.release]
 opt-level = "s"
 
