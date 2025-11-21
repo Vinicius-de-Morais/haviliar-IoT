@@ -27,6 +27,16 @@ name = "lora-display"
 path = "bin/lora-display.rs"
 harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
 
+[[bin]]
+name = "wifi"
+path = "bin/wifi.rs"
+harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
+
+[[bin]]
+name = "teste"
+path = "bin/teste.rs"
+harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
+
 [profile.release]
 opt-level = "s"
 
@@ -79,6 +89,23 @@ static_cell = "2.1.1"
 esp-alloc = "0.8.0"
 esp-bootloader-esp-idf = { version = "0.2.0", features = ["esp32"] }
 critical-section = "1.2.0"
+embassy-net = { version = "0.7.0", features = [
+    "tcp",
+    "udp",
+    "dhcpv4",
+    "medium-ethernet",
+    "proto-ipv6",
+    "log",
+    "dns",
+] }
+esp-wifi = { version = "0.15.1", features = [
+    "esp32",
+    "wifi",
+    "esp-now",
+    "esp-alloc",
+    "log-04",
+] }
+rust-mqtt = { version = "0.3.0", default-features = false }
 
 # --- Optional Embassy Integration ---
 # esp-idf-svc = { version = "0.51", features = ["critical-section", "embassy-time-driver", "embassy-sync"] }

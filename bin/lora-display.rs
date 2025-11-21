@@ -2,15 +2,15 @@
 #![no_main]
 #![feature(impl_trait_in_assoc_type)]
 
-use core::{fmt::Write, task::Context};
+use core::{fmt::Write};
 use embassy_executor::Spawner;
-use embassy_sync::{blocking_mutex::{CriticalSectionMutex, Mutex, raw::CriticalSectionRawMutex}, channel::{Channel, Sender}, mutex::Mutex as AsyncMutex};
+use embassy_sync::{blocking_mutex::{raw::CriticalSectionRawMutex}, channel::{Channel}, mutex::Mutex as AsyncMutex};
 use embassy_time::Timer;
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
 use haviliar_iot::{
     factory::{display_factory::DisplayFactory, lora_factory::LoraFactory},
-    hal::{display::Display, lora::{Lora, PAYLOAD_LENGTH}, peripheral_manager::PeripheralManagerStatic},
+    hal::{lora::{Lora, PAYLOAD_LENGTH}, peripheral_manager::PeripheralManagerStatic},
 };
 use log::*;
 use esp_hal::clock::CpuClock;
@@ -39,7 +39,11 @@ async fn task_send(
 
                 info!("Received message from Channel to send via LoRa: {:?}", &message[..4]);
 
-                Lora::send_from_mutex(lora, &mut message).await;
+                match Lora::send_from_mutex(lora, &mut message).await {
+                    Ok(_) => info!("LoRa message sent successfully"),
+                    Err(e) => error!("Failed to send LoRa message: {:?}", e),
+                    
+                }
             }
             Err(e) => {
                 error!("Failed to receive from Channel: {:?}", e);
@@ -58,7 +62,7 @@ async fn task_receive(
     loop{
         Timer::after_millis(100).await;
 
-        let mut recv_buffer = [0u8; PAYLOAD_LENGTH];
+        //let mut recv_buffer = [0u8; PAYLOAD_LENGTH];
 
 
         //TODO: The code below is not working as expected. Fix it.
