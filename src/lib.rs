@@ -29,7 +29,7 @@ pub fn init_heap() {
 pub mod hal;
 pub mod factory;
 extern crate alloc;
-
+pub mod controller;
 
 // Add this to your lib.rs file
 #[cfg(test)]

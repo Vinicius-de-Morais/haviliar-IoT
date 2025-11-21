@@ -3,12 +3,12 @@
 #![feature(impl_trait_in_assoc_type)]
 
 use embassy_executor::Spawner;
-use embassy_sync::{blocking_mutex::{raw::CriticalSectionRawMutex}, channel::{Channel, Receiver}};
+use embassy_sync::{blocking_mutex::raw::{CriticalSectionRawMutex, RawMutex}, channel::{Channel, Receiver}, mutex::Mutex};
 use embassy_time::Timer;
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
 use haviliar_iot::{
-    hal::{peripheral_manager::PeripheralManagerStatic, servo_motor::ServoMotor, wifi::Wifi},
+    controller::mqtt::{self, MqttController}, hal::{peripheral_manager::PeripheralManagerStatic, servo_motor::ServoMotor, wifi::Wifi}
 };
 use log::*;
 use esp_hal::{clock::CpuClock};
@@ -35,6 +35,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 static SERVO_CHANNEL: StaticCell<Channel<CriticalSectionRawMutex, i16, 4>> = StaticCell::new();
 static RX_BUFFER_CELL: StaticCell<[u8; 4096]> = StaticCell::new();
 static TX_BUFFER_CELL: StaticCell<[u8; 4096]> = StaticCell::new();
+static SOCKET_CELL: StaticCell<TcpSocket<'static>> = StaticCell::new();
+static MQTT_CLIENT_CELL: StaticCell<Mutex<CriticalSectionRawMutex, MqttController>> = StaticCell::new();
 
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>, ssid: &'static str, password: &'static str) {
@@ -86,33 +88,16 @@ async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
 async fn servo_task(receiver: Receiver<'static, CriticalSectionRawMutex, i16, 4>, mut servo: ServoMotor) {
     
     info!("Servo task started");
-    // Small async test sequence (await-able)
-    info!("Running quick GPIO17 (LEDC) test...");
-    for i in 0..3 {
-
-        for deg in 0..=180 {
-            match servo.set_angle(deg) {
-                    Ok(_) => (), //info!("Servo set to angle: {}", deg),
-                    Err(e) => error!("Failed to set servo angle: {:?}", e),
-                }
-            Timer::after(Duration::from_millis(10)).await;
-        }
-        
-        Timer::after(Duration::from_millis(400)).await;
-    }
-    info!("GPIO17 (LEDC) test finished. If servo doesn't move, check wiring/power.");
-
+    servo.close();
 
     loop {
         match receiver.try_receive() {
             Ok(message) => {
                 let angle = message as u32;
-                info!("Servo requested angle: {}", angle);
-        
-                match servo.set_angle(angle) {
-                    Ok(_) => info!("Servo set to angle: {}", angle),
-                    Err(e) => error!("Failed to set servo angle: {:?}", e),
-                }
+                //info!("Servo requested angle: {}", angle);
+                servo.open();
+                Timer::after(Duration::from_secs(3)).await;
+                servo.close();
             }
             Err(e) => {
                 //error!("Failed to receive from Channel: {:?}", e);
@@ -123,86 +108,55 @@ async fn servo_task(receiver: Receiver<'static, CriticalSectionRawMutex, i16, 4>
 }
 
 #[embassy_executor::task]
-async fn watch_mqtt_messages(mut socket: TcpSocket<'static>, remote_endpoint: (embassy_net::Ipv4Address, u16), sender: embassy_sync::channel::Sender<'static, CriticalSectionRawMutex, i16, 4>) {
-    
-    loop {
-        let connection = socket.connect(remote_endpoint).await;
-        if let Err(e) = connection {
-            error!("TCP connect error: {:?}", e);
-            error!("Waiting 10 seconds before retry...");
-            Timer::after(Duration::from_secs(1)).await;
-            continue;
-        }
-        info!("TCP connected successfully!");
-        break;
-    }
+async fn watch_mqtt_messages(mqtt_controller_mutex: &'static Mutex<CriticalSectionRawMutex, MqttController<'static>>, sender: embassy_sync::channel::Sender<'static, CriticalSectionRawMutex, i16, 4>) {
     loop {
 
-        // Use larger buffers for MQTT communication
-        let mut recv_buffer = [0; 512];
-        let mut write_buffer = [0; 512];
-    
-        let mut config: ClientConfig<'_, 5, CountingRng> = ClientConfig::new(
-            rust_mqtt::client::client_config::MqttVersion::MQTTv5,
-            CountingRng(20000),
-        );
-        config.add_max_subscribe_qos(rust_mqtt::packet::v5::publish_packet::QualityOfService::QoS1);
-        config.add_client_id("esp32-haviliar");
-        config.max_packet_size = 255;
-        //config.keep_alive = 60; // Keep connection alive for 60 seconds
-        
-        let mut client = MqttClient::<_, 5, _>::new(&mut socket, &mut write_buffer, 255, &mut recv_buffer, 255, config);
-    
-        info!("Connecting to MQTT broker...");
-        info!("Attempting MQTT handshake with broker at {:?}...", remote_endpoint);
-    
-        match client.connect_to_broker().await {
-            Ok(()) => {
-                info!("✓ MQTT connected!");
-            }
-            Err(mqtt_error) => {
-                error!("MQTT connect error: {:?}", mqtt_error);
-            }
-        }
-    
-        match client.subscribe_to_topic("esp32/open").await {
-                Ok(()) => {
-                    info!("✓ Subscribed to topic 'esp32/open' successfully!");
+        let mut mqtt_controller = mqtt_controller_mutex.lock().await;
+        match mqtt_controller.receive_message().await {
+                Ok((topic, payload)) => {
+                    let msg = core::str::from_utf8(&payload).unwrap_or("<invalid utf8>");
+                    info!("Received message on topic '{}': {}", topic, msg);
+
+                    // Tentar parsear como inteiro (ângulo)
+                    if let Ok(angle) = msg.trim().parse::<i16>() {
+                        // limitar faixa (0..=180)
+                        let angle = angle.clamp(0, 180);
+                        info!("Setting servo angle to: {}", angle);
+                        match sender.try_send(angle) {
+                            Ok(_) => info!("Sent angle to servo task"),
+                            Err(e) => error!("Failed to send angle to servo task: {:?}", e),
+                        }                         
+                    } else {
+                        info!("Payload não é um inteiro válido para ângulo: '{}'", msg);
+                    }
                 }
                 Err(mqtt_error) => {
-                    error!("Subscribe error: {:?}", mqtt_error);
+                    error!("Receive message error: {:?}", mqtt_error);
+                    //break;
                 }
-            }
-    
-        loop {
-            match client.receive_message().await {
-                    Ok((topic, payload)) => {
-                        let msg = core::str::from_utf8(&payload).unwrap_or("<invalid utf8>");
-                        info!("Received message on topic '{}': {}", topic, msg);
-    
-                        // Tentar parsear como inteiro (ângulo)
-                        if let Ok(angle) = msg.trim().parse::<i16>() {
-                            // limitar faixa (0..=180)
-                            let angle = angle.clamp(0, 180);
-                            info!("Setting servo angle to: {}", angle);
-                            match sender.try_send(angle) {
-                                Ok(_) => info!("Sent angle to servo task"),
-                                Err(e) => error!("Failed to send angle to servo task: {:?}", e),
-                            }                         
-                        } else {
-                            info!("Payload não é um inteiro válido para ângulo: '{}'", msg);
-                        }
-                    }
-                    Err(mqtt_error) => {
-                        error!("Receive message error: {:?}", mqtt_error);
-                        //break;
-                    }
-            }
-            Timer::after(Duration::from_secs(1)).await;
         }
+        Timer::after(Duration::from_secs(1)).await;
     }
-
 }
+
+#[embassy_executor::task]
+async fn send_ping_task(mqtt_controller: &'static Mutex<CriticalSectionRawMutex, MqttController<'static>>) {
+    loop {
+        {
+            let mut controller = mqtt_controller.lock().await;
+            match controller.send_ping().await {
+                Ok(()) => {
+                    info!("Ping sent successfully");
+                }
+                Err(mqtt_error) => {
+                    error!("Ping error: {:?}", mqtt_error);
+                }
+            };
+        }
+        Timer::after(Duration::from_secs(30)).await;
+    }
+}
+
 
 use core::mem::MaybeUninit;
 
@@ -220,9 +174,8 @@ async fn main(_spawner: Spawner) {
             esp_alloc::MemoryCapability::Internal.into(),
         ));
     }
-    
     info!("Heap initialized with {} bytes", HEAP_SIZE);
-
+    
     init_logger(log::LevelFilter::Info);
         
     info!("Initializing ESP32 Wifi...");
@@ -256,15 +209,12 @@ async fn main(_spawner: Spawner) {
         Timer::after(Duration::from_millis(500)).await;
     }
 
-
-
-
     // INICIAR SERVO MOTOR
     info!("Initializing Servo Motor...");
     let servo_peripherals = peripheral_manager.take_servo_peripherals().unwrap();
     let servo_motor = ServoMotor::new(servo_peripherals);
 
-        // Spawn a task que controla o servo
+    // Spawn a task que controla o servo
     let channel = SERVO_CHANNEL.init(Channel::new());
     let sender = channel.sender();
     let receiver = channel.receiver();
@@ -279,6 +229,7 @@ async fn main(_spawner: Spawner) {
 
         break;
     }
+
     let config = stack.config_v4().unwrap();
     info!("Current IP: {} | Gateway: {:?}", config.address, config.gateway);
 
@@ -289,62 +240,38 @@ async fn main(_spawner: Spawner) {
     socket.set_timeout(Some(embassy_time::Duration::from_secs(60))); 
     socket.set_keep_alive(Some(embassy_time::Duration::from_secs(30)));
 
-    let address = embassy_net::Ipv4Address::new(192, 168, 1, 100);
+    let socket = SOCKET_CELL.init(socket);
+
+    let address = embassy_net::Ipv4Address::new(192, 168, 1, 21);
     let remote_endpoint = (address, 1883);
 
-    let _ = _spawner.spawn(watch_mqtt_messages(socket, remote_endpoint, sender));
+    loop {
+        let connection = socket.connect(remote_endpoint).await;
+        if let Err(e) = connection {
+            error!("TCP connect error: {:?}", e);
+            error!("Waiting 10 seconds before retry...");
+            Timer::after(Duration::from_secs(1)).await;
+            continue;
+        }
+        info!("TCP connected successfully!");
+        break;
+    }
+
+    let mqtt_controller = match MqttController::new(socket, "esp32/haviliar", "esp32-haviliar").await {
+        Ok(controller) => controller,
+        Err(e) => {
+            error!("Failed to create MQTT controller: {:?}", e);
+            return;
+        }
+    };
+
+    let mqtt_controller_mutex = MQTT_CLIENT_CELL.init(Mutex::new(mqtt_controller));
+    let _ = _spawner.spawn(send_ping_task(mqtt_controller_mutex));
+    let _ = _spawner.spawn(watch_mqtt_messages(mqtt_controller_mutex, sender));
 
     // Main loop
     loop {
 
-        // let address = match stack
-        //     .dns_query("test.mosquitto.org", DnsQueryType::A)
-        //     .await
-        //     .map(|a| a[0])
-        // {
-        //     Ok(address) => {
-        //         info!("DNS resolved to: {:?}", address);
-        //         address
-        //     },
-        //     Err(e) => {
-        //         error!("DNS lookup error: {:?}", e);
-        //         Timer::after(Duration::from_secs(5)).await;
-        //         continue;
-        //     }
-        // };
-        // Use WSL eth0 IP address - check with: ip addr show eth0
-        //let address = embassy_net::Ipv4Address::new(192, 168, 1, 21);
-
-        //let address = embassy_net::Ipv4Address::new(10, 255, 255, 254);
-        
-
-
-        // let connection = socket.connect(remote_endpoint).await;
-        // if let Err(e) = connection {
-        //     error!("TCP connect error: {:?}", e);
-        //     error!("Waiting 10 seconds before retry...");
-        //     Timer::after(Duration::from_secs(10)).await;
-        //     continue;
-        // }
-        // info!("TCP connected successfully!");
-        
-        //info!("Publishing message to 'esp32/test'...");
-        // match client
-        //     .send_message(
-        //         "esp32/test",
-        //         b"Hello from ESP32!",
-        //         rust_mqtt::packet::v5::publish_packet::QualityOfService::QoS1,
-        //         true,
-        //     )
-        //     .await
-        // {
-        //     Ok(()) => {
-        //         info!("✓ Message published successfully!");
-        //     }
-        //     Err(mqtt_error) => {
-        //         error!("Publish error: {:?}", mqtt_error);
-        //     }
-        // }
         Timer::after(Duration::from_secs(10)).await;
     }
 }

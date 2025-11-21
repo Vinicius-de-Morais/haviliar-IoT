@@ -66,5 +66,13 @@ impl ServoMotor {
 
         self.channel.set_duty_cycle(duty)
     }
+
+    pub fn open(&mut self) -> Result<(), esp_hal::ledc::channel::Error> {
+        self.set_angle(45)
+    }
+
+    pub fn close(&mut self) -> Result<(), esp_hal::ledc::channel::Error> {
+        self.set_angle(0)
+    }
 }
 
