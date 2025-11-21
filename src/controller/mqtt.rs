@@ -64,7 +64,7 @@ impl<'a> MqttController<'a> {
                 //address,
                 client,
                 main_topic,
-                is_connected: false,
+                is_connected: true,
             }
         )
     }
