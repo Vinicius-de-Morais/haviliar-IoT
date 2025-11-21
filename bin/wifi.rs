@@ -18,8 +18,7 @@ use esp_wifi::{
     wifi::{ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState}
 };
 use embassy_net::{
-    tcp::TcpSocket,
-    Runner
+    Runner, dns::Socket, tcp::TcpSocket
 };
 use embassy_time::{Duration};
 use rust_mqtt::{
@@ -34,7 +33,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 //static WIFI_CONTROLLER: StaticCell<WifiController<'static>> = StaticCell::new();
 //static WIFI_RUNNER: StaticCell<Runner<'static, WifiDevice<'static>>> = StaticCell::new();
 static SERVO_CHANNEL: StaticCell<Channel<CriticalSectionRawMutex, i16, 4>> = StaticCell::new();
-
+static RX_BUFFER_CELL: StaticCell<[u8; 4096]> = StaticCell::new();
+static TX_BUFFER_CELL: StaticCell<[u8; 4096]> = StaticCell::new();
 
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>, ssid: &'static str, password: &'static str) {
@@ -90,12 +90,14 @@ async fn servo_task(receiver: Receiver<'static, CriticalSectionRawMutex, i16, 4>
     info!("Running quick GPIO17 (LEDC) test...");
     for i in 0..3 {
 
-        info!("Test cycle {}: MIN_DUTY", i);
-        servo.set_angle(255);
-        Timer::after(Duration::from_millis(400)).await;
+        for deg in 0..=180 {
+            match servo.set_angle(deg) {
+                    Ok(_) => (), //info!("Servo set to angle: {}", deg),
+                    Err(e) => error!("Failed to set servo angle: {:?}", e),
+                }
+            Timer::after(Duration::from_millis(10)).await;
+        }
         
-        info!("Test cycle {}: MAX_DUTY", i);
-        servo.set_angle(0);
         Timer::after(Duration::from_millis(400)).await;
     }
     info!("GPIO17 (LEDC) test finished. If servo doesn't move, check wiring/power.");
@@ -104,20 +106,102 @@ async fn servo_task(receiver: Receiver<'static, CriticalSectionRawMutex, i16, 4>
     loop {
         match receiver.try_receive() {
             Ok(message) => {
-                let angle = message;
+                let angle = message as u32;
                 info!("Servo requested angle: {}", angle);
         
-                servo.set_angle(angle);
-        
-                info!("Servo set to angle: {}", angle);
-                Timer::after(Duration::from_millis(10)).await;
+                match servo.set_angle(angle) {
+                    Ok(_) => info!("Servo set to angle: {}", angle),
+                    Err(e) => error!("Failed to set servo angle: {:?}", e),
+                }
             }
             Err(e) => {
-                error!("Failed to receive from Channel: {:?}", e);
+                //error!("Failed to receive from Channel: {:?}", e);
             }
         }
-        Timer::after(Duration::from_millis(600)).await;
+        Timer::after(Duration::from_millis(10)).await;
     }
+}
+
+#[embassy_executor::task]
+async fn watch_mqtt_messages(mut socket: TcpSocket<'static>, remote_endpoint: (embassy_net::Ipv4Address, u16), sender: embassy_sync::channel::Sender<'static, CriticalSectionRawMutex, i16, 4>) {
+    
+    loop {
+        let connection = socket.connect(remote_endpoint).await;
+        if let Err(e) = connection {
+            error!("TCP connect error: {:?}", e);
+            error!("Waiting 10 seconds before retry...");
+            Timer::after(Duration::from_secs(1)).await;
+            continue;
+        }
+        info!("TCP connected successfully!");
+        break;
+    }
+    loop {
+
+        // Use larger buffers for MQTT communication
+        let mut recv_buffer = [0; 512];
+        let mut write_buffer = [0; 512];
+    
+        let mut config: ClientConfig<'_, 5, CountingRng> = ClientConfig::new(
+            rust_mqtt::client::client_config::MqttVersion::MQTTv5,
+            CountingRng(20000),
+        );
+        config.add_max_subscribe_qos(rust_mqtt::packet::v5::publish_packet::QualityOfService::QoS1);
+        config.add_client_id("esp32-haviliar");
+        config.max_packet_size = 255;
+        //config.keep_alive = 60; // Keep connection alive for 60 seconds
+        
+        let mut client = MqttClient::<_, 5, _>::new(&mut socket, &mut write_buffer, 255, &mut recv_buffer, 255, config);
+    
+        info!("Connecting to MQTT broker...");
+        info!("Attempting MQTT handshake with broker at {:?}...", remote_endpoint);
+    
+        match client.connect_to_broker().await {
+            Ok(()) => {
+                info!("✓ MQTT connected!");
+            }
+            Err(mqtt_error) => {
+                error!("MQTT connect error: {:?}", mqtt_error);
+            }
+        }
+    
+        match client.subscribe_to_topic("esp32/open").await {
+                Ok(()) => {
+                    info!("✓ Subscribed to topic 'esp32/open' successfully!");
+                }
+                Err(mqtt_error) => {
+                    error!("Subscribe error: {:?}", mqtt_error);
+                }
+            }
+    
+        loop {
+            match client.receive_message().await {
+                    Ok((topic, payload)) => {
+                        let msg = core::str::from_utf8(&payload).unwrap_or("<invalid utf8>");
+                        info!("Received message on topic '{}': {}", topic, msg);
+    
+                        // Tentar parsear como inteiro (ângulo)
+                        if let Ok(angle) = msg.trim().parse::<i16>() {
+                            // limitar faixa (0..=180)
+                            let angle = angle.clamp(0, 180);
+                            info!("Setting servo angle to: {}", angle);
+                            match sender.try_send(angle) {
+                                Ok(_) => info!("Sent angle to servo task"),
+                                Err(e) => error!("Failed to send angle to servo task: {:?}", e),
+                            }                         
+                        } else {
+                            info!("Payload não é um inteiro válido para ângulo: '{}'", msg);
+                        }
+                    }
+                    Err(mqtt_error) => {
+                        error!("Receive message error: {:?}", mqtt_error);
+                        //break;
+                    }
+            }
+            Timer::after(Duration::from_secs(1)).await;
+        }
+    }
+
 }
 
 use core::mem::MaybeUninit;
@@ -172,8 +256,7 @@ async fn main(_spawner: Spawner) {
         Timer::after(Duration::from_millis(500)).await;
     }
 
-    let mut rx_buffer = [0; 4096];
-    let mut tx_buffer = [0; 4096];
+
 
 
     // INICIAR SERVO MOTOR
@@ -181,29 +264,38 @@ async fn main(_spawner: Spawner) {
     let servo_peripherals = peripheral_manager.take_servo_peripherals().unwrap();
     let servo_motor = ServoMotor::new(servo_peripherals);
 
-    
-    // Spawn a task que controla o servo
+        // Spawn a task que controla o servo
     let channel = SERVO_CHANNEL.init(Channel::new());
     let sender = channel.sender();
     let receiver = channel.receiver();
     let _ = _spawner.spawn(servo_task(receiver, servo_motor));
 
-    // Main loop
     loop {
-        // Verificar se ainda temos IP antes de tentar conectar
         if stack.config_v4().is_none() {
             error!("Lost IP address, waiting...");
             Timer::after(Duration::from_secs(5)).await;
             continue;
         }
 
-        let config = stack.config_v4().unwrap();
-        info!("Current IP: {} | Gateway: {:?}", config.address, config.gateway);
+        break;
+    }
+    let config = stack.config_v4().unwrap();
+    info!("Current IP: {} | Gateway: {:?}", config.address, config.gateway);
 
-        let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
-        socket.set_timeout(Some(embassy_time::Duration::from_secs(60))); 
-        socket.set_keep_alive(Some(embassy_time::Duration::from_secs(30)));
+    let rx_buffer = RX_BUFFER_CELL.init([0; 4096]);
+    let tx_buffer = TX_BUFFER_CELL.init([0; 4096]);
 
+    let mut socket = TcpSocket::new(stack, rx_buffer, tx_buffer);
+    socket.set_timeout(Some(embassy_time::Duration::from_secs(60))); 
+    socket.set_keep_alive(Some(embassy_time::Duration::from_secs(30)));
+
+    let address = embassy_net::Ipv4Address::new(192, 168, 1, 100);
+    let remote_endpoint = (address, 1883);
+
+    let _ = _spawner.spawn(watch_mqtt_messages(socket, remote_endpoint, sender));
+
+    // Main loop
+    loop {
 
         // let address = match stack
         //     .dns_query("test.mosquitto.org", DnsQueryType::A)
@@ -221,58 +313,22 @@ async fn main(_spawner: Spawner) {
         //     }
         // };
         // Use WSL eth0 IP address - check with: ip addr show eth0
-        let address = embassy_net::Ipv4Address::new(192, 168, 1, 21);
+        //let address = embassy_net::Ipv4Address::new(192, 168, 1, 21);
 
-        let remote_endpoint = (address, 1883);
-        info!("Connecting to {:?}...", remote_endpoint);
+        //let address = embassy_net::Ipv4Address::new(10, 255, 255, 254);
         
-        // Adicionar delay antes de conectar
-        Timer::after(Duration::from_millis(100)).await;
-        
-        let connection = socket.connect(remote_endpoint).await;
-        if let Err(e) = connection {
-            error!("TCP connect error: {:?}", e);
-            error!("Waiting 10 seconds before retry...");
-            Timer::after(Duration::from_secs(10)).await;
-            continue;
-        }
-        info!("TCP connected successfully!");
 
-        // Dar tempo para a conexão estabilizar
-        Timer::after(Duration::from_millis(500)).await;
 
-        // Use larger buffers for MQTT communication
-        let mut recv_buffer = [0; 512];
-        let mut write_buffer = [0; 512];
-
-        let mut config: ClientConfig<'_, 5, CountingRng> = ClientConfig::new(
-            rust_mqtt::client::client_config::MqttVersion::MQTTv5,
-            CountingRng(20000),
-        );
-        config.add_max_subscribe_qos(rust_mqtt::packet::v5::publish_packet::QualityOfService::QoS1);
-        config.add_client_id("esp32-haviliar");
-        config.max_packet_size = 255;
-        config.keep_alive = 60; // Keep connection alive for 60 seconds
+        // let connection = socket.connect(remote_endpoint).await;
+        // if let Err(e) = connection {
+        //     error!("TCP connect error: {:?}", e);
+        //     error!("Waiting 10 seconds before retry...");
+        //     Timer::after(Duration::from_secs(10)).await;
+        //     continue;
+        // }
+        // info!("TCP connected successfully!");
         
-        let mut client =
-            MqttClient::<_, 5, _>::new(socket, &mut write_buffer, 255, &mut recv_buffer, 255, config);
-
-        info!("Connecting to MQTT broker...");
-        info!("Attempting MQTT handshake with broker at {:?}...", remote_endpoint);
-        
-        match client.connect_to_broker().await {
-            Ok(()) => {
-                info!("✓ MQTT connected!");
-            }
-            Err(mqtt_error) => {
-                error!("MQTT connect error: {:?}", mqtt_error);
-                error!("Waiting 5s before retrying...");
-                Timer::after(Duration::from_secs(5)).await;
-                continue;
-            }
-        }
-        
-        info!("Publishing message to 'esp32/test'...");
+        //info!("Publishing message to 'esp32/test'...");
         // match client
         //     .send_message(
         //         "esp32/test",
@@ -289,59 +345,6 @@ async fn main(_spawner: Spawner) {
         //         error!("Publish error: {:?}", mqtt_error);
         //     }
         // }
-
-        match client.subscribe_to_topic("esp32/open").await {
-            Ok(()) => {
-                info!("✓ Subscribed to topic 'esp32/test' successfully!");
-            }
-            Err(mqtt_error) => {
-                error!("Subscribe error: {:?}", mqtt_error);
-            }
-        }
-
-        // Process incoming messages for a short duration
-        let start_time = embassy_time::Instant::now();
-        let processing_duration = Duration::from_secs(10); // Process messages for 10 seconds
-        loop {
-            if embassy_time::Instant::now() - start_time > processing_duration {
-                info!("Finished processing incoming messages.");
-                break;
-            }
-
-            match client.receive_message().await {
-                Ok((topic, payload)) => {
-                    // info!(
-                    //     "Received message on topic '{}': {}",
-                    //     topic,
-                    //     core::str::from_utf8(&payload).unwrap_or("<invalid utf8>")
-                    // );
-                    let msg = core::str::from_utf8(&payload).unwrap_or("<invalid utf8>");
-                    info!("Received message on topic '{}': {}", topic, msg);
-
-                    // Tentar parsear como inteiro (ângulo)
-                    if let Ok(angle) = msg.trim().parse::<i16>() {
-                        // limitar faixa (0..=180)
-                        let angle = angle.clamp(0, 180);
-                        info!("Setting servo angle to: {}", angle);
-                        match sender.try_send(angle) {
-                            Ok(_) => info!("Sent angle to servo task"),
-                            Err(e) => error!("Failed to send angle to servo task: {:?}", e),
-                        }                         
-                    } else {
-                        info!("Payload não é um inteiro válido para ângulo: '{}'", msg);
-                    }
-                }
-                Err(mqtt_error) => {
-                    error!("Receive message error: {:?}", mqtt_error);
-                    break;
-                }
-            }
-        }
-
-        // Esperar um pouco antes de desconectar
-        Timer::after(Duration::from_secs(3)).await;
-        
-        info!("Disconnecting and waiting 10s before next cycle...");
         Timer::after(Duration::from_secs(10)).await;
     }
 }

@@ -1,6 +1,6 @@
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use esp_hal::peripherals::{Peripherals, I2C0, SPI2, GPIO4, GPIO5, GPIO19, GPIO27, GPIO26, GPIO18, GPIO14, GPIO15, GPIO16, GPIO12, TIMG0, TIMG1, RNG, WIFI, LEDC};
+use esp_hal::peripherals::{Peripherals, I2C0, SPI2, GPIO4, GPIO5, GPIO19, GPIO27, GPIO26, GPIO18, GPIO14, GPIO15, GPIO16, GPIO13, TIMG0, TIMG1, RNG, WIFI, LEDC};
 use esp_hal::timer::timg::TimerGroup;
 use core::cell::RefCell;
 use core::option::Option;
@@ -35,7 +35,7 @@ pub struct WifiPeripherals {
 
 pub struct ServoPeripherals {
     //pub pin: GPIO17<'static>,
-    pub pin: GPIO12<'static>,
+    pub pin: GPIO13<'static>,
     pub ledc: LEDC<'static>,
 }
 
@@ -74,8 +74,7 @@ impl PeripheralManager {
         };
 
         let servo_peripherals = ServoPeripherals {
-            //pin: peripherals.GPIO17,
-            pin: peripherals.GPIO12,
+            pin: peripherals.GPIO13,
             ledc: peripherals.LEDC,
         };
         
