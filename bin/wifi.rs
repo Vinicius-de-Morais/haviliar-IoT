@@ -257,7 +257,7 @@ async fn main(_spawner: Spawner) {
         break;
     }
 
-    let mqtt_controller = match MqttController::new(socket, "esp32/haviliar", "esp32-haviliar").await {
+    let mqtt_controller = match MqttController::new(socket, "esp32/open", "esp32-haviliar").await {
         Ok(controller) => controller,
         Err(e) => {
             error!("Failed to create MQTT controller: {:?}", e);

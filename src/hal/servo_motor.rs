@@ -68,11 +68,11 @@ impl ServoMotor {
     }
 
     pub fn open(&mut self) -> Result<(), esp_hal::ledc::channel::Error> {
-        self.set_angle(45)
+        self.set_angle(135)
     }
 
     pub fn close(&mut self) -> Result<(), esp_hal::ledc::channel::Error> {
-        self.set_angle(0)
+        self.set_angle(180)
     }
 }
 
