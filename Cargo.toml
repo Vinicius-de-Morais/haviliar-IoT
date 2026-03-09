@@ -53,11 +53,11 @@ default = []
 #hal = { path = "hal" }
 #factory = { path = "factory" }
 #esp-hal = { version = "=1.0.0-beta.1", features = ["esp32", "unstable"] }
-esp-hal = { version = "=1.0.0-rc.0", features = ["esp32", "unstable"] }
-esp-hal-embassy = {version = "0.9.1", features = ["esp32"]}
-#esp-hal-embassy = {version = "0.7.0", features = ["esp32"]}
-esp-backtrace = { version = "0.17.0", features = ["esp32", "panic-handler", "exception-handler", "println"] }
-esp-println = { version = "0.15.0", features = ["esp32", "log-04"] }
+esp-hal = { version = "=1.0.0-rc.0", features = ["esp32s3", "unstable"] }
+esp-hal-embassy = {version = "0.9.1", features = ["esp32s3"]}
+#esp-hal-embassy = {version = "0.7.0", features = ["esp32s3"]}
+esp-backtrace = { version = "0.17.0", features = ["esp32s3", "panic-handler", "exception-handler", "println"] }
+esp-println = { version = "0.15.0", features = ["esp32s3", "log-04"] }
 
 # Embassy async runtime
 #embassy-executor = { version = "0.7.0", features = ["defmt", "nightly"] }
@@ -87,7 +87,7 @@ fugit = "0.3"
 static_cell = "2.1.1"
 #defmt-test = "0.4.0"
 esp-alloc = "0.8.0"
-esp-bootloader-esp-idf = { version = "0.2.0", features = ["esp32"] }
+esp-bootloader-esp-idf = { version = "0.2.0", features = ["esp32s3"] }
 critical-section = "1.2.0"
 embassy-net = { version = "0.7.0", features = [
     "tcp",
@@ -99,7 +99,7 @@ embassy-net = { version = "0.7.0", features = [
     "dns",
 ] }
 esp-wifi = { version = "0.15.1", features = [
-    "esp32",
+    "esp32s3",
     "wifi",
     "esp-now",
     "esp-alloc",
@@ -129,9 +129,9 @@ embuild = "0.33"
 
 
 [build]
-target = "xtensa-esp32-none-elf"
+target = "xtensa-esp32s3-none-elf"
 
-[target.xtensa-esp32-none-elf]
+[target.xtensa-esp32s3-none-elf]
 runner = "espflash flash --monitor"
 
 [unstable]

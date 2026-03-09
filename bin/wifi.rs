@@ -88,16 +88,16 @@ async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
 async fn servo_task(receiver: Receiver<'static, CriticalSectionRawMutex, i16, 4>, mut servo: ServoMotor) {
     
     info!("Servo task started");
-    servo.close();
+    //servo.close();
 
     loop {
         match receiver.try_receive() {
             Ok(message) => {
                 let angle = message as u32;
                 //info!("Servo requested angle: {}", angle);
-                servo.open();
+                //servo.open();
                 Timer::after(Duration::from_secs(3)).await;
-                servo.close();
+                //servo.close();
             }
             Err(e) => {
                 //error!("Failed to receive from Channel: {:?}", e);
@@ -166,7 +166,7 @@ static mut HEAP: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZ
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
-
+    // Initialize heap first before any logging
     unsafe {
         esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
             HEAP.as_mut_ptr() as *mut u8,
@@ -174,9 +174,9 @@ async fn main(_spawner: Spawner) {
             esp_alloc::MemoryCapability::Internal.into(),
         ));
     }
-    info!("Heap initialized with {} bytes", HEAP_SIZE);
     
     init_logger(log::LevelFilter::Info);
+    info!("Heap initialized with {} bytes", HEAP_SIZE);
         
     info!("Initializing ESP32 Wifi...");
 
@@ -212,13 +212,13 @@ async fn main(_spawner: Spawner) {
     // INICIAR SERVO MOTOR
     info!("Initializing Servo Motor...");
     let servo_peripherals = peripheral_manager.take_servo_peripherals().unwrap();
-    let servo_motor = ServoMotor::new(servo_peripherals);
+    //let servo_motor = ServoMotor::new(servo_peripherals);
 
     // Spawn a task que controla o servo
     let channel = SERVO_CHANNEL.init(Channel::new());
     let sender = channel.sender();
     let receiver = channel.receiver();
-    let _ = _spawner.spawn(servo_task(receiver, servo_motor));
+    //let _ = _spawner.spawn(servo_task(receiver, servo_motor));
 
     loop {
         if stack.config_v4().is_none() {
