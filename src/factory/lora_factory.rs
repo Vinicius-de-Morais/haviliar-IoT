@@ -22,7 +22,7 @@ impl LoraFactory {
         let spi = peripherals.spi;
         let mosi = peripherals.mosi;
         let miso = peripherals.miso;
-        let sclk = peripherals.sclk;
+        let sck = peripherals.sck;
         
         info!("Pego os perifericos do lora");
 
@@ -31,11 +31,11 @@ impl LoraFactory {
         .unwrap()
         .with_mosi(mosi)
         .with_miso(miso)
-        .with_sck(sclk)
+        .with_sck(sck)
         .into_async();
     
         info!("SPI initialized");
 
-        Lora::new(spi, peripherals.rst, peripherals.dio1, peripherals.nss).await
+        Lora::new(spi, peripherals.rst, peripherals.irq, peripherals.cs).await
     }
 }

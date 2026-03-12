@@ -45,20 +45,20 @@ impl<'d> Lora<'d>
         spi: Spi<'static, Async>,
         rst: GPIO14<'static>,
         dio1: GPIO26<'static>,
-        nss: GPIO18<'static>,
+        cs: GPIO18<'static>,
     ) -> Result<Self> {
 
         info!("Entrou na criacao do lora");
         let delay = EmbassyDelay;
 
-        let nss = Output::new(nss, Level::High, OutputConfig::default());
+        let cs = Output::new(cs, Level::High, OutputConfig::default());
         let reset = Output::new(rst, Level::Low, OutputConfig::default());
         let dio1 = Input::new(dio1, InputConfig::default());
 
         // Initialize the static SPI bus
         info!("Creating bus");
         let spi_bus = SPI_BUS.init(Mutex::new(spi));
-        let spi_device = embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice::new(spi_bus, nss);
+        let spi_device = embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice::new(spi_bus, cs);
 
 
         // Create interface
@@ -156,7 +156,7 @@ impl<'d> Lora<'d>
     }
 
     pub async fn receive(&mut self, buffer: &mut [u8]) -> Result<(u8, lora_phy::mod_params::PacketStatus), RadioError> {
-        match self.driver.prepare_for_rx(RxMode::Continuous, &self.modulation, &self.rx_packet_params).await {
+        match self.driver.prepare_for_rx(RxMode::Single(255), &self.modulation, &self.rx_packet_params).await {
             Ok(()) => {
                 self.driver.rx(&mut self.rx_packet_params, buffer).await
             },

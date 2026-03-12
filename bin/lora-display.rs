@@ -62,14 +62,26 @@ async fn task_receive(
     loop{
         Timer::after_millis(100).await;
 
-        //let mut recv_buffer = [0u8; PAYLOAD_LENGTH];
+        let mut recv_buffer = [0u8; PAYLOAD_LENGTH];
 
 
         //TODO: The code below is not working as expected. Fix it.
         // it seems to be blocking the lora structure
-        // {
-        //     Lora::receive_from_mutex(lora, &mut recv_buffer).await;
-        // }
+        {
+            let result = Lora::receive_from_mutex(lora, &mut recv_buffer).await;
+
+            match result {
+                Ok((len, status)) => {
+                    if len > 0 {
+                        info!("Received LoRa message of length {}: {:?}", len, &recv_buffer[..len as usize]);
+                    }
+                    info!("LoRa packet status: {:?}", status.rssi);
+                }
+                Err(e) => error!("Failed to receive LoRa message: {:?}", e),
+            }
+
+            info!("Received LoRa message: {:?}", &recv_buffer[..core::cmp::min(4, recv_buffer.len())]);
+        }
         
         Timer::after_millis(100).await;
     }
@@ -123,7 +135,7 @@ async fn main(_spawner: Spawner) {
         error!("Failed to show initial message: {:?}", e);
     }
     
-    let _ = _spawner.spawn(task_send(channel, lora));
+    //let _ = _spawner.spawn(task_send(channel, lora));
     let _ = _spawner.spawn(task_receive(lora));
     
     // Main loop

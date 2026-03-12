@@ -19,11 +19,11 @@ pub struct DisplayPeripherals{
 /// Structured container for LoRa peripherals
 pub struct LoRaPeripherals {
     pub spi: SPI2<'static>,
-    pub sclk: GPIO5<'static>,
+    pub sck: GPIO5<'static>,
     pub mosi: GPIO27<'static>,
     pub miso: GPIO19<'static>,
-    pub nss: GPIO18<'static>,
-    pub dio1: GPIO26<'static>,
+    pub cs: GPIO18<'static>,
+    pub irq: GPIO26<'static>,
     pub rst: GPIO14<'static>,
 }
 
@@ -59,11 +59,11 @@ impl PeripheralManager {
         
         let lora_peripherals = LoRaPeripherals {
             spi: peripherals.SPI2,
-            sclk: peripherals.GPIO5,
+            sck: peripherals.GPIO5,
             mosi: peripherals.GPIO27,
             miso: peripherals.GPIO19,
-            nss: peripherals.GPIO18,
-            dio1: peripherals.GPIO26,
+            cs: peripherals.GPIO18,
+            irq: peripherals.GPIO26,
             rst: peripherals.GPIO14,
         };
 
