@@ -2,7 +2,7 @@
 #![no_main]
 #![feature(impl_trait_in_assoc_type)]
 
-use core::{fmt::Write};
+use core::{fmt::Write, mem::MaybeUninit};
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::{raw::CriticalSectionRawMutex}, channel::{Channel}, mutex::Mutex as AsyncMutex};
 use embassy_time::Timer;
@@ -17,6 +17,9 @@ use esp_hal::clock::CpuClock;
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
+
+const HEAP_SIZE: usize = 64 * 1024; // 64KB heap
+static mut HEAP: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
 
 static LORA: StaticCell<AsyncMutex<CriticalSectionRawMutex, Lora<'static>>> = StaticCell::new();
 //static DISPLAY: StaticCell<AsyncMutex<CriticalSectionRawMutex, Display<'static>>> = StaticCell::new();
@@ -90,9 +93,16 @@ async fn task_receive(
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
-    init_logger(log::LevelFilter::Info);
+    // Initialize heap first before any logging
+    unsafe {
+        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+            HEAP.as_mut_ptr() as *mut u8,
+            HEAP_SIZE,
+            esp_alloc::MemoryCapability::Internal.into(),
+        ));
+    }
     
-    info!("haviliar_iot::init_heap() called");
+    init_logger(log::LevelFilter::Info);
     
     info!("Initializing ESP32 Display...");
 
@@ -103,14 +113,14 @@ async fn main(_spawner: Spawner) {
     esp_hal_embassy::init(time_per.timer0);
 
     // Create display
-    let display_peripherals = peripheral_manager.take_display_peripherals().unwrap();
-    let mut display = match DisplayFactory::create_from_peripherals(display_peripherals) {
-        Ok(display) => display,
-        Err(e) => {
-            error!("Failed to create display: {}", e);
-            panic!("Display initialization failed");
-        }
-    };
+    // let display_peripherals = peripheral_manager.take_display_peripherals().unwrap();
+    // let mut display = match DisplayFactory::create_from_peripherals(display_peripherals) {
+    //     Ok(display) => display,
+    //     Err(e) => {
+    //         error!("Failed to create display: {}", e);
+    //         panic!("Display initialization failed");
+    //     }
+    // };
 
     info!("Initializing ESP32 LoRa...");
 
@@ -131,9 +141,9 @@ async fn main(_spawner: Spawner) {
 
     info!("Both display and LoRa initialized successfully!");
 
-    if let Err(e) = display.show_message("LoRa + Display OK!") {
-        error!("Failed to show initial message: {:?}", e);
-    }
+    // if let Err(e) = display.show_message("LoRa + Display OK!") {
+    //     error!("Failed to show initial message: {:?}", e);
+    // }
     
     //let _ = _spawner.spawn(task_send(channel, lora));
     let _ = _spawner.spawn(task_receive(lora));
@@ -141,31 +151,31 @@ async fn main(_spawner: Spawner) {
     // Main loop
     let mut counter = 0u32;
     loop {
-        if let Err(e) = display.clear() {
-            error!("Failed to clear display: {:?}", e);
-            continue;
-        }
+        // if let Err(e) = display.clear() {
+        //     error!("Failed to clear display: {:?}", e);
+        //     continue;
+        // }
 
         // Static text
-        if let Err(e) = display.text_new_line("LoRa + Display OK!", 1) {
-            error!("Failed to write text: {:?}", e);
-        }
+        // if let Err(e) = display.text_new_line("LoRa + Display OK!", 1) {
+        //     error!("Failed to write text: {:?}", e);
+        // }
         
-        if let Err(e) = display.text_new_line("Contador:", 2) {
-            error!("Failed to write text: {:?}", e);
-        }
+        // if let Err(e) = display.text_new_line("Contador:", 2) {
+        //     error!("Failed to write text: {:?}", e);
+        // }
 
         // Counter
         let mut counter_str = heapless::String::<10>::new();
         write!(&mut counter_str, "{}", counter).unwrap();
         
-        if let Err(e) = display.text_new_line(&counter_str, 3) {
-            error!("Failed to write counter: {:?}", e);
-        }
+        // if let Err(e) = display.text_new_line(&counter_str, 3) {
+        //     error!("Failed to write counter: {:?}", e);
+        // }
         
-        if let Err(e) = display.flush() {
-            error!("Failed to flush display: {:?}", e);
-        }
+        // if let Err(e) = display.flush() {
+        //     error!("Failed to flush display: {:?}", e);
+        // }
 
         
         let mut msg = [0u8; PAYLOAD_LENGTH];

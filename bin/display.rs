@@ -2,7 +2,7 @@
 #![no_main]
 #![feature(impl_trait_in_assoc_type)]
 
-use core::fmt::Write;
+use core::{fmt::Write, mem::MaybeUninit};
 use embassy_executor::Spawner;
 use embassy_time::{Timer};
 use esp_backtrace as _;
@@ -16,12 +16,21 @@ use esp_hal::{clock::CpuClock};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
+const HEAP_SIZE: usize = 64 * 1024; // 64KB heap
+static mut HEAP: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
+
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
+    // Initialize heap first before any logging
+    unsafe {
+        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+            HEAP.as_mut_ptr() as *mut u8,
+            HEAP_SIZE,
+            esp_alloc::MemoryCapability::Internal.into(),
+        ));
+    }
+    
     init_logger(log::LevelFilter::Info);
-
-    haviliar_iot::init_heap(); // Initialize the heap
-    info!("haviliar_iot::init_heap() called");
     
     info!("Initializing ESP32 with embassy...");
 
