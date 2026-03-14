@@ -12,7 +12,7 @@ use lora_phy::{
 use embassy_time::Delay as EmbassyDelay;
 use log::*;
 use core::result::Result::Err;
-use esp_hal::peripherals::{GPIO14, GPIO26, GPIO18};
+use esp_hal::peripherals::{GPIO14, GPIO12, GPIO8};
 use core::default::Default;
 use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 use embassy_sync::mutex::Mutex as AsyncMutex;
@@ -43,9 +43,9 @@ impl<'d> Lora<'d>
 {
     pub async fn new(
         spi: Spi<'static, Async>,
-        rst: GPIO14<'static>,
-        dio1: GPIO26<'static>,
-        cs: GPIO18<'static>,
+        rst: GPIO12<'static>,
+        dio1: GPIO14<'static>,
+        cs: GPIO8<'static>,
     ) -> Result<Self> {
 
         info!("Entrou na criacao do lora");

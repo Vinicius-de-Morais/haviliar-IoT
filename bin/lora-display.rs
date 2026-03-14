@@ -113,14 +113,14 @@ async fn main(_spawner: Spawner) {
     esp_hal_embassy::init(time_per.timer0);
 
     // Create display
-    // let display_peripherals = peripheral_manager.take_display_peripherals().unwrap();
-    // let mut display = match DisplayFactory::create_from_peripherals(display_peripherals) {
-    //     Ok(display) => display,
-    //     Err(e) => {
-    //         error!("Failed to create display: {}", e);
-    //         panic!("Display initialization failed");
-    //     }
-    // };
+    let display_peripherals = peripheral_manager.take_display_peripherals().unwrap();
+    let mut display = match DisplayFactory::create_from_peripherals(display_peripherals) {
+        Ok(display) => display,
+        Err(e) => {
+            error!("Failed to create display: {}", e);
+            panic!("Display initialization failed");
+        }
+    };
 
     info!("Initializing ESP32 LoRa...");
 
@@ -141,41 +141,41 @@ async fn main(_spawner: Spawner) {
 
     info!("Both display and LoRa initialized successfully!");
 
-    // if let Err(e) = display.show_message("LoRa + Display OK!") {
-    //     error!("Failed to show initial message: {:?}", e);
-    // }
+    if let Err(e) = display.show_message("LoRa + Display OK!") {
+        error!("Failed to show initial message: {:?}", e);
+    }
     
-    //let _ = _spawner.spawn(task_send(channel, lora));
-    let _ = _spawner.spawn(task_receive(lora));
+    let _ = _spawner.spawn(task_send(channel, lora));
+    //let _ = _spawner.spawn(task_receive(lora));
     
     // Main loop
     let mut counter = 0u32;
     loop {
-        // if let Err(e) = display.clear() {
-        //     error!("Failed to clear display: {:?}", e);
-        //     continue;
-        // }
+        if let Err(e) = display.clear() {
+            error!("Failed to clear display: {:?}", e);
+            continue;
+        }
 
         // Static text
-        // if let Err(e) = display.text_new_line("LoRa + Display OK!", 1) {
-        //     error!("Failed to write text: {:?}", e);
-        // }
+        if let Err(e) = display.text_new_line("LoRa + Display OK!", 1) {
+            error!("Failed to write text: {:?}", e);
+        }
         
-        // if let Err(e) = display.text_new_line("Contador:", 2) {
-        //     error!("Failed to write text: {:?}", e);
-        // }
+        if let Err(e) = display.text_new_line("Contador:", 2) {
+            error!("Failed to write text: {:?}", e);
+        }
 
         // Counter
         let mut counter_str = heapless::String::<10>::new();
         write!(&mut counter_str, "{}", counter).unwrap();
         
-        // if let Err(e) = display.text_new_line(&counter_str, 3) {
-        //     error!("Failed to write counter: {:?}", e);
-        // }
+        if let Err(e) = display.text_new_line(&counter_str, 3) {
+            error!("Failed to write counter: {:?}", e);
+        }
         
-        // if let Err(e) = display.flush() {
-        //     error!("Failed to flush display: {:?}", e);
-        // }
+        if let Err(e) = display.flush() {
+            error!("Failed to flush display: {:?}", e);
+        }
 
         
         let mut msg = [0u8; PAYLOAD_LENGTH];
@@ -187,7 +187,7 @@ async fn main(_spawner: Spawner) {
             Err(e) => error!("Failed to send message to LoRa task: {:?}", e),
         }
         
-        //let _ = sender.send(msg);
+        let _ = sender.send(msg);
         
         info!("Counter: {}", counter);
         counter += 1;

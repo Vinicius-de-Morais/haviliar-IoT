@@ -18,7 +18,7 @@ use ssd1306::{
 };
 use log::*;
 use core::default::Default;
-use esp_hal::peripherals::{GPIO4, GPIO15, GPIO16};
+use esp_hal::peripherals::{GPIO17, GPIO18, GPIO21};
 
 pub struct Display<'d> {
     rst_pin: Output<'d>,
@@ -33,9 +33,9 @@ pub struct Display<'d> {
 impl<'d> Display<'d> {
     pub fn new(
         i2c_peripheral: esp_hal::peripherals::I2C0<'d>,
-        sda: GPIO4<'d>,
-        scl: GPIO15<'d>,
-        rst: GPIO16<'d>,
+        sda: GPIO17<'d>,
+        scl: GPIO18<'d>,
+        rst: GPIO21<'d>,
     ) -> Result<Self> {
         // Configure I2C  
         let config = Config::default();//.with_frequency(100_000_u32.Hz());

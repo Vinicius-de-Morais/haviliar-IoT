@@ -1,6 +1,6 @@
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use esp_hal::peripherals::{Peripherals, I2C0, SPI2, GPIO4, GPIO5, GPIO19, GPIO27, GPIO26, GPIO18, GPIO14, GPIO15, GPIO16, GPIO13, TIMG0, TIMG1, RNG, WIFI, LEDC};
+use esp_hal::peripherals::{Peripherals, I2C0, SPI2, GPIO17, GPIO9, GPIO10, GPIO11, GPIO8, GPIO12, GPIO21, GPIO18, GPIO47, GPIO14, TIMG0, TIMG1, RNG, WIFI, LEDC};
 use esp_hal::timer::timg::TimerGroup;
 use core::cell::RefCell;
 use core::option::Option;
@@ -11,20 +11,20 @@ use core::cell::UnsafeCell;
 /// Structured container for display peripherals
 pub struct DisplayPeripherals{
     pub i2c: I2C0<'static>,
-    pub sda: GPIO4<'static>,
-    pub scl: GPIO15<'static>,
-    pub rst: GPIO16<'static>,
+    pub sda: GPIO17<'static>,
+    pub scl: GPIO18<'static>,
+    pub rst: GPIO21<'static>,
 }
 
 /// Structured container for LoRa peripherals
 pub struct LoRaPeripherals {
     pub spi: SPI2<'static>,
-    pub sck: GPIO5<'static>,
-    pub mosi: GPIO27<'static>,
-    pub miso: GPIO19<'static>,
-    pub cs: GPIO18<'static>,
-    pub irq: GPIO26<'static>,
-    pub rst: GPIO14<'static>,
+    pub sck: GPIO9<'static>,
+    pub mosi: GPIO10<'static>,
+    pub miso: GPIO11<'static>,
+    pub cs: GPIO8<'static>,
+    pub dio: GPIO14<'static>,
+    pub rst: GPIO12<'static>,
 }
 
 pub struct WifiPeripherals {
@@ -35,7 +35,7 @@ pub struct WifiPeripherals {
 
 pub struct ServoPeripherals {
     //pub pin: GPIO17<'static>,
-    pub pin: GPIO13<'static>,
+    pub pin: GPIO47<'static>,
     pub ledc: LEDC<'static>,
 }
 
@@ -52,19 +52,19 @@ impl PeripheralManager {
     pub fn new(peripherals: Peripherals) -> Self {
         let display_peripherals = DisplayPeripherals {
             i2c: peripherals.I2C0,
-            sda: peripherals.GPIO4,
-            scl: peripherals.GPIO15,
-            rst: peripherals.GPIO16,
+            sda: peripherals.GPIO17,
+            scl: peripherals.GPIO18,
+            rst: peripherals.GPIO21,
         };
         
         let lora_peripherals = LoRaPeripherals {
             spi: peripherals.SPI2,
-            sck: peripherals.GPIO5,
-            mosi: peripherals.GPIO27,
-            miso: peripherals.GPIO19,
-            cs: peripherals.GPIO18,
-            irq: peripherals.GPIO26,
-            rst: peripherals.GPIO14,
+            sck: peripherals.GPIO9,
+            mosi: peripherals.GPIO10,
+            miso: peripherals.GPIO11,
+            cs: peripherals.GPIO8,
+            dio: peripherals.GPIO14,
+            rst: peripherals.GPIO12,
         };
 
         let wifi_peripherals = WifiPeripherals {
@@ -74,7 +74,7 @@ impl PeripheralManager {
         };
 
         let servo_peripherals = ServoPeripherals {
-            pin: peripherals.GPIO13,
+            pin: peripherals.GPIO47,
             ledc: peripherals.LEDC,
         };
         
