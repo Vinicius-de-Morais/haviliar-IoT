@@ -36,6 +36,6 @@ impl LoraFactory {
     
         info!("SPI initialized");
 
-        Lora::new(spi, peripherals.rst, peripherals.dio, peripherals.cs).await
+        Lora::new(spi, peripherals.rst, peripherals.dio, peripherals.cs, peripherals.busy).await
     }
 }

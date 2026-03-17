@@ -4,15 +4,12 @@ use static_cell::StaticCell;
 use core::result::Result::Ok;
 use esp_hal::{gpio::{Input, InputConfig, Level, Output, OutputConfig}, spi::{master::Spi}, Async};
 use lora_phy::{
-    sx127x::{Sx127x, Sx1276, Config},
-    iv::GenericSx127xInterfaceVariant,
-    mod_params::{Bandwidth, CodingRate, ModulationParams, PacketParams, RadioError, SpreadingFactor},
-    LoRa as LoRaPhy, RxMode,
+    LoRa as LoRaPhy, RxMode, iv::{GenericSx126xInterfaceVariant, GenericSx127xInterfaceVariant}, mod_params::{Bandwidth, CodingRate, ModulationParams, PacketParams, RadioError, SpreadingFactor}, sx126x::{self, Sx126x, Sx1262, TcxoCtrlVoltage}, sx127x::{Config, Sx127x, Sx1276}
 };
 use embassy_time::Delay as EmbassyDelay;
 use log::*;
 use core::result::Result::Err;
-use esp_hal::peripherals::{GPIO14, GPIO12, GPIO8};
+use esp_hal::peripherals::{GPIO14, GPIO12, GPIO8, GPIO13};
 use core::default::Default;
 use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 use embassy_sync::mutex::Mutex as AsyncMutex;
@@ -21,7 +18,7 @@ use embassy_sync::mutex::Mutex as AsyncMutex;
 const LORA_FREQUENCY_IN_HZ: u32 = 903_900_000;
 pub const PAYLOAD_LENGTH: usize = 255;
 
-type LoRaInterface<'d> = GenericSx127xInterfaceVariant<
+type LoRaInterface<'d> = GenericSx126xInterfaceVariant<
     Output<'d>,
     Input<'d>,
 >;
@@ -32,7 +29,7 @@ pub static SPI_BUS: StaticCell<MutexCriticalSectionSpiAsync> =
     StaticCell::new();
 
 pub struct Lora<'d> {
-    driver: LoRaPhy<Sx127x<SpiDevice<'d, CriticalSectionRawMutex, Spi<'static, Async>, Output<'d>>, LoRaInterface<'d>, Sx1276>, EmbassyDelay>,
+    driver: LoRaPhy<Sx126x<SpiDevice<'d, CriticalSectionRawMutex, Spi<'static, Async>, Output<'d>>, LoRaInterface<'d>, Sx1262>, EmbassyDelay>,
     modulation: ModulationParams,
     rx_packet_params: PacketParams,
     tx_packet_params: PacketParams,
@@ -46,6 +43,7 @@ impl<'d> Lora<'d>
         rst: GPIO12<'static>,
         dio1: GPIO14<'static>,
         cs: GPIO8<'static>,
+        busy: GPIO13<'static>
     ) -> Result<Self> {
 
         info!("Entrou na criacao do lora");
@@ -54,6 +52,7 @@ impl<'d> Lora<'d>
         let cs = Output::new(cs, Level::High, OutputConfig::default());
         let reset = Output::new(rst, Level::Low, OutputConfig::default());
         let dio1 = Input::new(dio1, InputConfig::default());
+        let busy = Input::new(busy, InputConfig::default());
 
         // Initialize the static SPI bus
         info!("Creating bus");
@@ -63,25 +62,26 @@ impl<'d> Lora<'d>
 
         // Create interface
         info!("Creating Interface");
-        let interface = GenericSx127xInterfaceVariant::new(
+        let interface = GenericSx126xInterfaceVariant::new(
             reset,
             dio1,
+            busy,
             core::option::Option::None,
             core::option::Option::None,
         ).unwrap();
 
         // Configure radio
-        let config = Config {
-            chip: Sx1276,
-            tcxo_used: false,
-            tx_boost: false,
-            rx_boost: true,
-        };
+        let config = sx126x::Config {
+        chip: Sx1262,
+        tcxo_ctrl: Some(TcxoCtrlVoltage::Ctrl1V7),
+        use_dcdc: false,
+        rx_boost: true,
+    };
 
-        let sx127x = Sx127x::new(spi_device, interface, config);
+        let sx126x = Sx126x::new(spi_device, interface, config);
         
         // Initialize LoRa driver
-        let mut driver = match LoRaPhy::new(sx127x, false, delay).await {
+        let mut driver = match LoRaPhy::new(sx126x, false, delay).await {
             Ok(d) => d,
             Err(err) => {
                 error!("LoRa initialization error: {:?}", err);

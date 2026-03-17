@@ -1,6 +1,6 @@
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use esp_hal::peripherals::{Peripherals, I2C0, SPI2, GPIO17, GPIO9, GPIO10, GPIO11, GPIO8, GPIO12, GPIO21, GPIO18, GPIO47, GPIO14, TIMG0, TIMG1, RNG, WIFI, LEDC};
+use esp_hal::peripherals::{Peripherals, I2C0, SPI2, GPIO17, GPIO9, GPIO10, GPIO11, GPIO8, GPIO12, GPIO21, GPIO18, GPIO47, GPIO13, GPIO14, TIMG0, TIMG1, RNG, WIFI, LEDC};
 use esp_hal::timer::timg::TimerGroup;
 use core::cell::RefCell;
 use core::option::Option;
@@ -25,6 +25,7 @@ pub struct LoRaPeripherals {
     pub cs: GPIO8<'static>,
     pub dio: GPIO14<'static>,
     pub rst: GPIO12<'static>,
+    pub busy: GPIO13<'static>,
 }
 
 pub struct WifiPeripherals {
@@ -65,6 +66,7 @@ impl PeripheralManager {
             cs: peripherals.GPIO8,
             dio: peripherals.GPIO14,
             rst: peripherals.GPIO12,
+            busy: peripherals.GPIO13,
         };
 
         let wifi_peripherals = WifiPeripherals {
