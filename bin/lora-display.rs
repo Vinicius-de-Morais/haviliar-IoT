@@ -60,6 +60,8 @@ async fn task_receive(
     ) {
     
     loop{
+
+        info!("Init to receive LoRa message");
         Timer::after_millis(100).await;
 
         let mut recv_buffer = [0u8; PAYLOAD_LENGTH];

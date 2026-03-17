@@ -75,7 +75,7 @@ impl<'d> Lora<'d>
             chip: Sx1276,
             tcxo_used: false,
             tx_boost: false,
-            rx_boost: false,
+            rx_boost: true,
         };
 
         let sx127x = Sx127x::new(spi_device, interface, config);
@@ -145,33 +145,38 @@ impl<'d> Lora<'d>
 
     pub async fn send(&mut self, payload: &[u8]) -> Result<(), RadioError> {
         match self.driver.prepare_for_tx(&self.modulation, &mut self.tx_packet_params, 20, payload).await {
-            Ok(()) => {
-                self.driver.tx().await
-            },
+            Ok(()) => {},
             Err(e) => {
                 error!("Failed to prepare for TX: {:?}", e);
                 return Err(e);
             }
         }
+
+        self.driver.tx().await
     }
 
     pub async fn receive(&mut self, buffer: &mut [u8]) -> Result<(u8, lora_phy::mod_params::PacketStatus), RadioError> {
+        info!("Preparing to receive LoRa message...");
         match self.driver.prepare_for_rx(RxMode::Single(255), &self.modulation, &self.rx_packet_params).await {
-            Ok(()) => {
-                self.driver.rx(&mut self.rx_packet_params, buffer).await
-            },
+            Ok(()) => {},
             Err(e) => {
                 error!("Failed to prepare for RX: {:?}", e);
                 return Err(e);
             }
-        }
+        };
+
+        info!("Waiting for LoRa message...");
+        self.driver.rx(&mut self.rx_packet_params, buffer).await
     }
 
     pub async fn receive_from_mutex(
         lora: &'static AsyncMutex<CriticalSectionRawMutex, Lora<'static>>, 
         buffer: &mut [u8]
     ) -> Result<(u8, lora_phy::mod_params::PacketStatus), RadioError> {
+        info!("Attempting to lock Lora mutex for receiving...");
         let mut lora_ref  = lora.lock().await;
+
+        info!("Attempting to receive LoRa message from mutex...");
 
         match lora_ref.receive(buffer).await {
             Ok((length, status)) => {
