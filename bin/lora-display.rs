@@ -147,8 +147,8 @@ async fn main(_spawner: Spawner) {
         error!("Failed to show initial message: {:?}", e);
     }
     
-    let _ = _spawner.spawn(task_send(channel, lora));
-    //let _ = _spawner.spawn(task_receive(lora));
+    //let _ = _spawner.spawn(task_send(channel, lora));
+    let _ = _spawner.spawn(task_receive(lora));
     
     // Main loop
     let mut counter = 0u32;

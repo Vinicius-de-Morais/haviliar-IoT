@@ -157,7 +157,7 @@ impl<'d> Lora<'d>
 
     pub async fn receive(&mut self, buffer: &mut [u8]) -> Result<(u8, lora_phy::mod_params::PacketStatus), RadioError> {
         info!("Preparing to receive LoRa message...");
-        match self.driver.prepare_for_rx(RxMode::Single(255), &self.modulation, &self.rx_packet_params).await {
+        match self.driver.prepare_for_rx(RxMode::Continuous, &self.modulation, &self.rx_packet_params).await {
             Ok(()) => {},
             Err(e) => {
                 error!("Failed to prepare for RX: {:?}", e);
