@@ -5,12 +5,18 @@
 use core::{fmt::Write, mem::MaybeUninit};
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::{raw::CriticalSectionRawMutex}, channel::{Channel}, mutex::Mutex as AsyncMutex};
-use embassy_time::Timer;
+use embassy_time::{Instant, Timer};
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
 use haviliar_iot::{
     factory::{display_factory::DisplayFactory, lora_factory::LoraFactory},
-    hal::{lora::{Lora, PAYLOAD_LENGTH}, peripheral_manager::PeripheralManagerStatic},
+    hal::{
+        lora::{
+            decode_legacy_counter, decode_protocol_message, decode_protocol_payload_utf8,
+            encode_counter_message, Lora, OutgoingMessage, PAYLOAD_LENGTH,
+        },
+        peripheral_manager::PeripheralManagerStatic,
+    },
 };
 use log::*;
 use esp_hal::clock::CpuClock;
@@ -23,37 +29,25 @@ static mut HEAP: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZ
 
 static LORA: StaticCell<AsyncMutex<CriticalSectionRawMutex, Lora<'static>>> = StaticCell::new();
 //static DISPLAY: StaticCell<AsyncMutex<CriticalSectionRawMutex, Display<'static>>> = StaticCell::new();
-static LORA_CHANNEL: StaticCell<Channel<CriticalSectionRawMutex, [u8; PAYLOAD_LENGTH], 10>> = StaticCell::new();
+type LoRaChannel = Channel<CriticalSectionRawMutex, OutgoingMessage, 1>;
+static LORA_CHANNEL: StaticCell<LoRaChannel> = StaticCell::new();
 
 #[embassy_executor::task]
 async fn task_send(
-    channel: &'static Channel<CriticalSectionRawMutex, [u8; PAYLOAD_LENGTH], 10>, 
+    channel: &'static LoRaChannel,
     lora: &'static AsyncMutex<CriticalSectionRawMutex, Lora<'static>>
     ) {
     
-    let receiver = channel.receiver();//channel.dyn_receiver();
+    let receiver = channel.receiver();
         
     loop {
-        info!("receiver.empty(): {}", receiver.is_empty());
-        info!("receiver.len(): {}", receiver.len());
+        let mut message = receiver.receive().await;
+        let payload = &mut message.payload[..message.len];
 
-        match receiver.try_receive() {
-            Ok(mut message) => {
-
-                info!("Received message from Channel to send via LoRa: {:?}", &message[..4]);
-
-                match Lora::send_from_mutex(lora, &mut message).await {
-                    Ok(_) => info!("LoRa message sent successfully"),
-                    Err(e) => error!("Failed to send LoRa message: {:?}", e),
-                    
-                }
-            }
-            Err(e) => {
-                error!("Failed to receive from Channel: {:?}", e);
-            }
+        match Lora::send_from_mutex(lora, payload).await {
+            Ok(_) => info!("LoRa message sent successfully"),
+            Err(e) => error!("Failed to send LoRa message: {:?}", e),
         }
-
-        Timer::after_millis(100).await;
     }
 }
 
@@ -77,8 +71,34 @@ async fn task_receive(
 
             match result {
                 Ok((len, status)) => {
-                    if len > 0 {
-                        info!("Received LoRa message of length {}: {:?}", len, &recv_buffer[..len as usize]);
+                    let len_usize = len as usize;
+                    if len_usize > 0 {
+                        let received_payload = &recv_buffer[..len_usize];
+
+                        if let Some(decoded) = decode_protocol_message(received_payload) {
+                            match decode_protocol_payload_utf8(&decoded) {
+                                Ok(text) => info!(
+                                    "Received CBOR message: v={}, type={}, seq={}, ts={}, payload='{}'",
+                                    decoded.version,
+                                    decoded.msg_type,
+                                    decoded.seq,
+                                    decoded.timestamp_ms,
+                                    text
+                                ),
+                                Err(_) => info!(
+                                    "Received CBOR message: v={}, type={}, seq={}, ts={}, payload(bytes)={:?}",
+                                    decoded.version,
+                                    decoded.msg_type,
+                                    decoded.seq,
+                                    decoded.timestamp_ms,
+                                    decoded.payload.as_ref()
+                                ),
+                            }
+                        } else if let Some(counter) = decode_legacy_counter(received_payload) {
+                            info!("Received legacy counter: {}", counter);
+                        } else {
+                            info!("Received message (unknown format, len {}): {:?}", len, received_payload);
+                        }
                     }
                     info!("LoRa packet status: {:?}", status.rssi);
                 }
@@ -147,11 +167,12 @@ async fn main(_spawner: Spawner) {
         error!("Failed to show initial message: {:?}", e);
     }
     
-    //let _ = _spawner.spawn(task_send(channel, lora));
+    let _ = _spawner.spawn(task_send(channel, lora));
     let _ = _spawner.spawn(task_receive(lora));
     
     // Main loop
     let mut counter = 0u32;
+    let mut tx_seq: u16 = 0;
     loop {
         if let Err(e) = display.clear() {
             error!("Failed to clear display: {:?}", e);
@@ -180,17 +201,19 @@ async fn main(_spawner: Spawner) {
         }
 
         
-        let mut msg = [0u8; PAYLOAD_LENGTH];
-        msg[0..4].copy_from_slice(&counter.to_le_bytes());
+        let now = Instant::now();
+        let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
         let sender = channel.sender();
-        
-        match sender.try_send(msg) {
-            Ok(_) => info!("Sent message to LoRa task"),
-            Err(e) => error!("Failed to send message to LoRa task: {:?}", e),
+
+        match encode_counter_message(tx_seq, counter, timestamp_ms) {
+            Some(msg) => {
+                sender.send(msg).await;
+                info!("Sent CBOR counter message to LoRa task");
+                tx_seq = tx_seq.wrapping_add(1);
+            }
+            None => error!("Failed to encode counter CBOR message"),
         }
-        
-        let _ = sender.send(msg);
-        
+
         info!("Counter: {}", counter);
         counter += 1;
 

@@ -10,7 +10,13 @@ use esp_backtrace as _;
 use esp_println::logger::init_logger;
 use haviliar_iot::{
     factory::{display_factory::DisplayFactory, lora_factory::LoraFactory},
-    hal::{lora::{Lora, PAYLOAD_LENGTH}, peripheral_manager::PeripheralManagerStatic},
+    hal::{
+        lora::{
+            decode_legacy_counter, decode_protocol_message, decode_protocol_payload_utf8,
+            encode_response_time_reply, Lora, OutgoingMessage, PAYLOAD_LENGTH,
+        },
+        peripheral_manager::PeripheralManagerStatic,
+    },
 };
 use log::*;
 use esp_hal::clock::CpuClock;
@@ -23,45 +29,31 @@ static mut HEAP: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZ
 
 static LORA: StaticCell<AsyncMutex<CriticalSectionRawMutex, Lora<'static>>> = StaticCell::new();
 //static DISPLAY: StaticCell<AsyncMutex<CriticalSectionRawMutex, Display<'static>>> = StaticCell::new();
-struct OutgoingMessage {
-    payload: [u8; PAYLOAD_LENGTH],
-    len: usize,
-}
 
-type LoRaChannel = Channel<CriticalSectionRawMutex, OutgoingMessage, 32>;
+type LoRaChannel = Channel<CriticalSectionRawMutex, OutgoingMessage, 1>;
+type SentAckChannel = Channel<CriticalSectionRawMutex, (), 1>;
 static LORA_CHANNEL: StaticCell<LoRaChannel> = StaticCell::new();
-
-fn build_reply_message(elapsed_ms: u64) -> OutgoingMessage {
-    let mut payload = [0u8; PAYLOAD_LENGTH];
-    let mut msg = heapless::String::<96>::new();
-
-    let _ = write!(
-        &mut msg,
-        "time elapse since last response: {} ms",
-        elapsed_ms
-    );
-
-    let bytes = msg.as_bytes();
-    let len = core::cmp::min(bytes.len(), PAYLOAD_LENGTH);
-    payload[..len].copy_from_slice(&bytes[..len]);
-
-    OutgoingMessage { payload, len }
-}
+static SENT_ACK_CHANNEL: StaticCell<SentAckChannel> = StaticCell::new();
 
 #[embassy_executor::task]
 async fn task_send(
-    channel: &'static LoRaChannel, 
+    channel: &'static LoRaChannel,
+    sent_ack_channel: &'static SentAckChannel,
     lora: &'static AsyncMutex<CriticalSectionRawMutex, Lora<'static>>
     ) {
     
     let receiver = channel.receiver();
+    let ack_sender = sent_ack_channel.sender();
         
     loop {
         let mut message = receiver.receive().await;
         let payload = &mut message.payload[..message.len];
 
         match Lora::send_from_mutex(lora, payload).await {
-            Ok(_) => info!("LoRa reply sent successfully"),
+            Ok(_) => {
+                info!("LoRa reply sent successfully");
+                ack_sender.send(()).await;
+            }
             Err(e) => error!("Failed to send LoRa reply: {:?}", e),
         }
     }
@@ -70,10 +62,13 @@ async fn task_send(
 #[embassy_executor::task]
 async fn task_receive(
     tx_channel: &'static LoRaChannel,
+    sent_ack_channel: &'static SentAckChannel,
     lora: &'static AsyncMutex<CriticalSectionRawMutex, Lora<'static>>
     ) {
     let tx_sender = tx_channel.sender();
+    let ack_receiver = sent_ack_channel.receiver();
     let mut last_response_at: Option<Instant> = None;
+    let mut tx_seq: u16 = 0;
     
     loop{
         info!("Waiting for LoRa response...");
@@ -86,7 +81,32 @@ async fn task_receive(
             Ok((len, status)) => {
                 let len_usize = len as usize;
                 if len_usize > 0 {
-                    info!("Received LoRa message of length {}: {:?}", len, &recv_buffer[..len_usize]);
+                    let received_payload = &recv_buffer[..len_usize];
+
+                    if let Some(decoded) = decode_protocol_message(received_payload) {
+                        match decode_protocol_payload_utf8(&decoded) {
+                            Ok(text) => info!(
+                                "Received CBOR message: v={}, type={}, seq={}, ts={}, payload='{}'",
+                                decoded.version,
+                                decoded.msg_type,
+                                decoded.seq,
+                                decoded.timestamp_ms,
+                                text
+                            ),
+                            Err(_) => info!(
+                                "Received CBOR message: v={}, type={}, seq={}, ts={}, payload(bytes)={:?}",
+                                decoded.version,
+                                decoded.msg_type,
+                                decoded.seq,
+                                decoded.timestamp_ms,
+                                decoded.payload.as_ref()
+                            ),
+                        }
+                    } else if let Some(counter) = decode_legacy_counter(received_payload) {
+                        info!("Received legacy counter: {}", counter);
+                    } else {
+                        info!("Received message (unknown format, len {}): {:?}", len, received_payload);
+                    }
                 }
                 info!("LoRa packet RSSI: {:?}", status.rssi);
 
@@ -97,10 +117,19 @@ async fn task_receive(
                     0
                 };
 
-                let reply = build_reply_message(elapsed_ms);
-                info!("Built reply message: {:?}", &reply.payload[..reply.len]);
-                tx_sender.send(reply).await;
-                last_response_at = Some(now);
+                let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
+
+                info!("Elapsed ms since last response: {}", elapsed_ms);
+
+                match encode_response_time_reply(tx_seq, elapsed_ms, timestamp_ms) {
+                    Some(reply) => {
+                        tx_sender.send(reply).await;
+                        ack_receiver.receive().await;
+                        tx_seq = tx_seq.wrapping_add(1);
+                        last_response_at = Some(now);
+                    }
+                    None => error!("Failed to encode CBOR reply"),
+                }
             }
             Err(e) => {
                 error!("Failed to receive LoRa message: {:?}", e);
@@ -153,6 +182,7 @@ async fn main(_spawner: Spawner) {
     };
 
     let channel = LORA_CHANNEL.init(Channel::new());
+    let sent_ack_channel = SENT_ACK_CHANNEL.init(Channel::new());
     let lora = LORA.init(AsyncMutex::new(lora));
 
     info!("Both display and LoRa initialized successfully!");
@@ -161,8 +191,8 @@ async fn main(_spawner: Spawner) {
         error!("Failed to show initial message: {:?}", e);
     }
     
-    let _ = _spawner.spawn(task_send(channel, lora));
-    let _ = _spawner.spawn(task_receive(channel, lora));
+    let _ = _spawner.spawn(task_send(channel, sent_ack_channel, lora));
+    let _ = _spawner.spawn(task_receive(channel, sent_ack_channel, lora));
     
     // Main loop
     let mut counter = 0u32;
