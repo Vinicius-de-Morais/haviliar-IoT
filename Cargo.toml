@@ -23,6 +23,11 @@ path = "bin/display.rs"
 harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
 
 [[bin]]
+name = "lora_response_time"
+path = "bin/lora_response_time.rs"
+harness = false # do no
+
+[[bin]]
 name = "lora-display"
 path = "bin/lora-display.rs"
 harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
