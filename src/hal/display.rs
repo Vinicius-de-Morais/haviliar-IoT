@@ -18,9 +18,11 @@ use ssd1306::{
 };
 use log::*;
 use core::default::Default;
-use esp_hal::peripherals::{GPIO17, GPIO18, GPIO21};
+use esp_hal::peripherals::{GPIO17, GPIO18, GPIO21, GPIO36};
 
 pub struct Display<'d> {
+    // Keep Vext configured and enabled for boards where OLED power is gated.
+    _vext_pin: Output<'d>,
     rst_pin: Output<'d>,
     display: Ssd1306<
         I2CInterface<I2c<'d, esp_hal::Blocking>>,
@@ -36,12 +38,19 @@ impl<'d> Display<'d> {
         sda: GPIO17<'d>,
         scl: GPIO18<'d>,
         rst: GPIO21<'d>,
+        vext: GPIO36<'d>,
     ) -> Result<Self> {
         // Configure I2C  
         let config = Config::default();//.with_frequency(100_000_u32.Hz());
         let mut i2c = I2c::new(i2c_peripheral, config)?;
         i2c = i2c.with_sda(sda);
         i2c = i2c.with_scl(scl);
+
+        // Heltec WiFi LoRa 32 V3 powers OLED through Vext (active LOW).
+        let mut vext_pin = Output::new(vext, esp_hal::gpio::Level::High, esp_hal::gpio::OutputConfig::default());
+        Delay::new().delay_millis(10);
+        vext_pin.set_low();
+        Delay::new().delay_millis(100);
 
         // Configure reset pin
         let mut rst_pin = Output::new(rst, esp_hal::gpio::Level::Low, esp_hal::gpio::OutputConfig::default());
@@ -66,6 +75,7 @@ impl<'d> Display<'d> {
         let text_style = MonoTextStyle::new(&FONT_6X10, BinaryColor::On);
         
         Ok(Display { 
+            _vext_pin: vext_pin,
             rst_pin,
             display, 
             text_style,

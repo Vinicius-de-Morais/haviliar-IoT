@@ -14,6 +14,7 @@ impl DisplayFactory {
             peripherals.sda,
             peripherals.scl,
             peripherals.rst,
+            peripherals.vext,
         )
     }
 
@@ -23,6 +24,7 @@ impl DisplayFactory {
             peripherals.sda,
             peripherals.scl,
             peripherals.rst,
+            peripherals.vext,
         )
     }
 }
