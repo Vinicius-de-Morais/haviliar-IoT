@@ -30,6 +30,7 @@ pub mod hal;
 pub mod factory;
 extern crate alloc;
 pub mod controller;
+pub mod protocol;
 
 // Add this to your lib.rs file
 #[cfg(test)]
