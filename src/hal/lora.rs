@@ -51,7 +51,7 @@ pub fn decode_legacy_counter(received: &[u8]) -> Option<u32> {
     lora_protocol::decode_legacy_counter(received)
 }
 
-type LoRaInterface<'d> = GenericSx126xInterfaceVariant<
+type LoRaInterface<'d> = GenericSx127xInterfaceVariant<
     Output<'d>,
     Input<'d>,
 >;
