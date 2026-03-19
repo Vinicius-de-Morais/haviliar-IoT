@@ -123,6 +123,9 @@ async fn task_receive(
 
                 match encode_response_time_reply(tx_seq, elapsed_ms, timestamp_ms) {
                     Some(reply) => {
+
+                        Timer::after_millis(1000).await;
+                        
                         tx_sender.send(reply).await;
                         ack_receiver.receive().await;
                         tx_seq = tx_seq.wrapping_add(1);
