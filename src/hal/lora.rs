@@ -14,6 +14,7 @@ use core::default::Default;
 use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 use embassy_sync::mutex::Mutex as AsyncMutex;
 use crate::protocol::lora as lora_protocol;
+use crate::protocol::lora as lora_protocol;
 
 
 const LORA_FREQUENCY_IN_HZ: u32 = 903_900_000;

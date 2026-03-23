@@ -5,7 +5,7 @@
 use core::{fmt::Write, mem::MaybeUninit};
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::{raw::CriticalSectionRawMutex}, channel::{Channel}, mutex::Mutex as AsyncMutex};
-use embassy_time::{Instant, Timer};
+use embassy_time::{Duration, Instant, Timer, WithTimeout};
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
 use haviliar_iot::{
@@ -26,6 +26,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 const HEAP_SIZE: usize = 64 * 1024; // 64KB heap
 static mut HEAP: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
+
+const RX_TIMEOUT_MS: u64 = 5000;
 
 static LORA: StaticCell<AsyncMutex<CriticalSectionRawMutex, Lora<'static>>> = StaticCell::new();
 //static DISPLAY: StaticCell<AsyncMutex<CriticalSectionRawMutex, Display<'static>>> = StaticCell::new();
@@ -69,16 +71,22 @@ async fn task_receive(
     let ack_receiver = sent_ack_channel.receiver();
     let mut last_response_at: Option<Instant> = None;
     let mut tx_seq: u16 = 0;
+    let mut last_sent_seq: Option<u16> = None;
+    let mut lost_packets: u32 = 0;
+    let mut response_samples: u32 = 0;
+    let mut total_response_ms: u64 = 0;
     
     loop{
         info!("Waiting for LoRa response...");
 
         let mut recv_buffer = [0u8; PAYLOAD_LENGTH];
 
-        let result = Lora::receive_from_mutex(lora, &mut recv_buffer).await;
+        let result = Lora::receive_from_mutex(lora, &mut recv_buffer)
+            .with_timeout(Duration::from_millis(RX_TIMEOUT_MS))
+            .await;
 
         match result {
-            Ok((len, status)) => {
+            Ok(Ok((len, status))) => {
                 let len_usize = len as usize;
                 if len_usize > 0 {
                     let received_payload = &recv_buffer[..len_usize];
@@ -111,6 +119,7 @@ async fn task_receive(
                 info!("LoRa packet RSSI: {:?}", status.rssi);
 
                 let now = Instant::now();
+                let had_prev = last_response_at.is_some();
                 let elapsed_ms = if let Some(last) = last_response_at {
                     (now - last).as_millis()
                 } else {
@@ -121,24 +130,64 @@ async fn task_receive(
 
                 info!("Elapsed ms since last response: {}", elapsed_ms);
 
-                match encode_response_time_reply(tx_seq, elapsed_ms, timestamp_ms) {
-                    Some(reply) => {
+                if had_prev {
+                    total_response_ms = total_response_ms.saturating_add(elapsed_ms);
+                    response_samples = response_samples.saturating_add(1);
+                }
 
-                        Timer::after_millis(1000).await;
-                        
+                match encode_response_time_reply(tx_seq, elapsed_ms, timestamp_ms) {
+                    Some(reply) => {                        
                         tx_sender.send(reply).await;
                         ack_receiver.receive().await;
+                        last_sent_seq = Some(tx_seq);
                         tx_seq = tx_seq.wrapping_add(1);
                         last_response_at = Some(now);
                     }
                     None => error!("Failed to encode CBOR reply"),
                 }
             }
-            Err(e) => {
+            Ok(Err(e)) => {
                 error!("Failed to receive LoRa message: {:?}", e);
                 Timer::after_millis(100).await;
             }
+            Err(_) => {
+                if let (Some(last_at), Some(seq)) = (last_response_at, last_sent_seq) {
+                    let now = Instant::now();
+                    let elapsed_ms = (now - last_at).as_millis();
+                    let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
+
+                    info!(
+                        "Receive timeout ({} ms). Packet loss assumed; resending seq {}",
+                        RX_TIMEOUT_MS,
+                        seq
+                    );
+
+                    lost_packets = lost_packets.saturating_add(1);
+
+                    match encode_response_time_reply(seq, elapsed_ms, timestamp_ms) {
+                        Some(reply) => {
+                            tx_sender.send(reply).await;
+                            ack_receiver.receive().await;
+                        }
+                        None => error!("Failed to encode CBOR reply after timeout"),
+                    }
+                } else {
+                    info!("Receive timeout ({} ms). No previous reply to resend.", RX_TIMEOUT_MS);
+                }
+            }
         }
+
+        let avg_ms = if response_samples > 0 {
+            total_response_ms / response_samples as u64
+        } else {
+            0
+        };
+        info!(
+            "Stats: lost_packets={}, avg_response_ms={} (samples={})",
+            lost_packets,
+            avg_ms,
+            response_samples
+        );
     }
 
 }
