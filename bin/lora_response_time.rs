@@ -19,7 +19,7 @@ use haviliar_iot::{
     },
 };
 use log::*;
-use esp_hal::clock::CpuClock;
+use esp_hal::{Async, clock::CpuClock, rng::Rng};
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -27,15 +27,19 @@ esp_bootloader_esp_idf::esp_app_desc!();
 const HEAP_SIZE: usize = 64 * 1024; // 64KB heap
 static mut HEAP: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
 
-const RX_TIMEOUT_MS: u64 = 5000;
+const FLOOR_RX_TIMEOUT_MS: u64 = 5000;
+const CEIL_RX_TIMEOUT_MS: u64 = 6000;
 
 static LORA: StaticCell<AsyncMutex<CriticalSectionRawMutex, Lora<'static>>> = StaticCell::new();
+static RNG: StaticCell<AsyncMutex<CriticalSectionRawMutex, Rng>> = StaticCell::new();
 //static DISPLAY: StaticCell<AsyncMutex<CriticalSectionRawMutex, Display<'static>>> = StaticCell::new();
 
 type LoRaChannel = Channel<CriticalSectionRawMutex, OutgoingMessage, 1>;
 type SentAckChannel = Channel<CriticalSectionRawMutex, (), 1>;
 static LORA_CHANNEL: StaticCell<LoRaChannel> = StaticCell::new();
 static SENT_ACK_CHANNEL: StaticCell<SentAckChannel> = StaticCell::new();
+
+static PACKAGE_LOST_COUNTER: StaticCell<AsyncMutex<CriticalSectionRawMutex, u32>> = StaticCell::new();
 
 #[embassy_executor::task]
 async fn task_send(
@@ -53,7 +57,7 @@ async fn task_send(
 
         match Lora::send_from_mutex(lora, payload).await {
             Ok(_) => {
-                info!("LoRa reply sent successfully");
+                //info!("LoRa reply sent successfully");
                 ack_sender.send(()).await;
             }
             Err(e) => error!("Failed to send LoRa reply: {:?}", e),
@@ -65,7 +69,10 @@ async fn task_send(
 async fn task_receive(
     tx_channel: &'static LoRaChannel,
     sent_ack_channel: &'static SentAckChannel,
-    lora: &'static AsyncMutex<CriticalSectionRawMutex, Lora<'static>>
+    lora: &'static AsyncMutex<CriticalSectionRawMutex, Lora<'static>>,
+    rng: &'static AsyncMutex<CriticalSectionRawMutex, Rng>,
+    package_lost_counter: &'static AsyncMutex<CriticalSectionRawMutex, u32>
+
     ) {
     let tx_sender = tx_channel.sender();
     let ack_receiver = sent_ack_channel.receiver();
@@ -76,13 +83,25 @@ async fn task_receive(
     let mut response_samples: u32 = 0;
     let mut total_response_ms: u64 = 0;
     
+    let random_timeout_ms = {
+        let mut rng_guard = rng.lock().await;
+        let span_ms = CEIL_RX_TIMEOUT_MS.saturating_sub(FLOOR_RX_TIMEOUT_MS).saturating_add(1);
+        let rand_ms = if span_ms > 0 {
+            (rng_guard.random() as u64) % span_ms
+        } else {
+            0
+        };
+        FLOOR_RX_TIMEOUT_MS.saturating_add(rand_ms)
+    };
+    
     loop{
-        info!("Waiting for LoRa response...");
+        //info!("Waiting for LoRa response...");
 
         let mut recv_buffer = [0u8; PAYLOAD_LENGTH];
+        
 
         let result = Lora::receive_from_mutex(lora, &mut recv_buffer)
-            .with_timeout(Duration::from_millis(RX_TIMEOUT_MS))
+            .with_timeout(Duration::from_millis(random_timeout_ms))
             .await;
 
         match result {
@@ -116,7 +135,7 @@ async fn task_receive(
                         info!("Received message (unknown format, len {}): {:?}", len, received_payload);
                     }
                 }
-                info!("LoRa packet RSSI: {:?}", status.rssi);
+                //info!("LoRa packet RSSI: {:?}", status.rssi);
 
                 let now = Instant::now();
                 let had_prev = last_response_at.is_some();
@@ -158,11 +177,14 @@ async fn task_receive(
 
                     info!(
                         "Receive timeout ({} ms). Packet loss assumed; resending seq {}",
-                        RX_TIMEOUT_MS,
+                        random_timeout_ms,
                         seq
                     );
 
                     lost_packets = lost_packets.saturating_add(1);
+
+                    let mut counter_guard = package_lost_counter.lock().await;
+                    *counter_guard = counter_guard.saturating_add(1);
 
                     match encode_response_time_reply(seq, elapsed_ms, timestamp_ms) {
                         Some(reply) => {
@@ -172,7 +194,7 @@ async fn task_receive(
                         None => error!("Failed to encode CBOR reply after timeout"),
                     }
                 } else {
-                    info!("Receive timeout ({} ms). No previous reply to resend.", RX_TIMEOUT_MS);
+                    info!("Receive timeout ({} ms). No previous reply to resend.", random_timeout_ms);
                 }
             }
         }
@@ -237,6 +259,11 @@ async fn main(_spawner: Spawner) {
     let sent_ack_channel = SENT_ACK_CHANNEL.init(Channel::new());
     let lora = LORA.init(AsyncMutex::new(lora));
 
+    let wifi_peripherals = peripheral_manager.take_wifi_peripherals().unwrap();
+    let rng = RNG.init(AsyncMutex::new(Rng::new(wifi_peripherals.rng)));
+
+    let package_lost_counter = PACKAGE_LOST_COUNTER.init(AsyncMutex::new(0));
+
     info!("Both display and LoRa initialized successfully!");
 
     if let Err(e) = display.show_message("LoRa + Display OK!") {
@@ -244,7 +271,7 @@ async fn main(_spawner: Spawner) {
     }
     
     let _ = _spawner.spawn(task_send(channel, sent_ack_channel, lora));
-    let _ = _spawner.spawn(task_receive(channel, sent_ack_channel, lora));
+    let _ = _spawner.spawn(task_receive(channel, sent_ack_channel, lora, rng, package_lost_counter));
     
     // Main loop
     let mut counter = 0u32;
@@ -271,10 +298,22 @@ async fn main(_spawner: Spawner) {
             error!("Failed to write counter: {:?}", e);
         }
         
+        display.text_new_line("Package Lost Counter: ", 4).ok();
+
+        // Package lost counter        let lost_count = {
+        let guard = package_lost_counter.lock().await;
+        let lost_count = *guard;
+        drop(guard);
+        let mut lost_str = heapless::String::<10>::new();
+        write!(&mut lost_str, "{}", lost_count).unwrap();
+        
+        if let Err(e) = display.text_new_line(&lost_str, 5) {
+            error!("Failed to write counter: {:?}", e);
+        }
+
         if let Err(e) = display.flush() {
             error!("Failed to flush display: {:?}", e);
         }
-
         
         counter += 1;
 
