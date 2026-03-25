@@ -4,7 +4,7 @@ use static_cell::StaticCell;
 use core::result::Result::Ok;
 use esp_hal::{gpio::{Input, InputConfig, Level, Output, OutputConfig}, spi::{master::Spi}, Async};
 use lora_phy::{
-    LoRa as LoRaPhy, RxMode, iv::{GenericSx126xInterfaceVariant, GenericSx127xInterfaceVariant}, mod_params::{Bandwidth, CodingRate, ModulationParams, PacketParams, RadioError, SpreadingFactor}, sx126x::{self, Sx126x, Sx1262, TcxoCtrlVoltage}, sx127x::{Config, Sx127x, Sx1276}
+    LoRa as LoRaPhy, RxMode, iv::{GenericSx126xInterfaceVariant}, mod_params::{Bandwidth, CodingRate, ModulationParams, PacketParams, RadioError, SpreadingFactor}, sx126x::{self, Sx126x, Sx1262, TcxoCtrlVoltage}
 };
 use embassy_time::Delay as EmbassyDelay;
 use log::*;
@@ -13,7 +13,6 @@ use esp_hal::peripherals::{GPIO14, GPIO12, GPIO8, GPIO13};
 use core::default::Default;
 use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 use embassy_sync::mutex::Mutex as AsyncMutex;
-use crate::protocol::lora as lora_protocol;
 use crate::protocol::lora as lora_protocol;
 
 
