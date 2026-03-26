@@ -12,7 +12,7 @@ use haviliar_iot::{
     factory::{display_factory::DisplayFactory, lora_factory::LoraFactory},
     hal::{
         lora::{
-            decode_legacy_counter, decode_protocol_message, decode_protocol_payload_utf8,
+            decode_protocol_message, decode_protocol_payload_utf8,
             encode_response_time_reply, Lora, OutgoingMessage, PAYLOAD_LENGTH,
         },
         peripheral_manager::PeripheralManagerStatic,
@@ -40,6 +40,7 @@ static LORA_CHANNEL: StaticCell<LoRaChannel> = StaticCell::new();
 static SENT_ACK_CHANNEL: StaticCell<SentAckChannel> = StaticCell::new();
 
 static PACKAGE_LOST_COUNTER: StaticCell<AsyncMutex<CriticalSectionRawMutex, u32>> = StaticCell::new();
+static CURRENT_RSSI: StaticCell<AsyncMutex<CriticalSectionRawMutex, u16>> = StaticCell::new();
 
 #[embassy_executor::task]
 async fn task_send(
@@ -71,8 +72,8 @@ async fn task_receive(
     sent_ack_channel: &'static SentAckChannel,
     lora: &'static AsyncMutex<CriticalSectionRawMutex, Lora<'static>>,
     rng: &'static AsyncMutex<CriticalSectionRawMutex, Rng>,
-    package_lost_counter: &'static AsyncMutex<CriticalSectionRawMutex, u32>
-
+    package_lost_counter: &'static AsyncMutex<CriticalSectionRawMutex, u32>,
+    current_rssi: &'static AsyncMutex<CriticalSectionRawMutex, u16>,
     ) {
     let tx_sender = tx_channel.sender();
     let ack_receiver = sent_ack_channel.receiver();
@@ -113,7 +114,7 @@ async fn task_receive(
                     if let Some(decoded) = decode_protocol_message(received_payload) {
                         match decode_protocol_payload_utf8(&decoded) {
                             Ok(text) => info!(
-                                "Received CBOR message: v={}, type={}, seq={}, ts={}, payload='{}'",
+                                "Received CBOR message: v={}, type={:?}, seq={}, ts={}, payload='{}'",
                                 decoded.version,
                                 decoded.msg_type,
                                 decoded.seq,
@@ -121,7 +122,7 @@ async fn task_receive(
                                 text
                             ),
                             Err(_) => info!(
-                                "Received CBOR message: v={}, type={}, seq={}, ts={}, payload(bytes)={:?}",
+                                "Received CBOR message: v={}, type={:?}, seq={}, ts={}, payload(bytes)={:?}",
                                 decoded.version,
                                 decoded.msg_type,
                                 decoded.seq,
@@ -129,13 +130,13 @@ async fn task_receive(
                                 decoded.payload.as_ref()
                             ),
                         }
-                    } else if let Some(counter) = decode_legacy_counter(received_payload) {
-                        info!("Received legacy counter: {}", counter);
                     } else {
                         info!("Received message (unknown format, len {}): {:?}", len, received_payload);
                     }
                 }
-                //info!("LoRa packet RSSI: {:?}", status.rssi);
+                
+                let mut rssi_guard = current_rssi.lock().await;
+                *rssi_guard = status.rssi as u16;
 
                 let now = Instant::now();
                 let had_prev = last_response_at.is_some();
@@ -263,6 +264,7 @@ async fn main(_spawner: Spawner) {
     let rng = RNG.init(AsyncMutex::new(Rng::new(wifi_peripherals.rng)));
 
     let package_lost_counter = PACKAGE_LOST_COUNTER.init(AsyncMutex::new(0));
+    let current_rssi = CURRENT_RSSI.init(AsyncMutex::new(0));
 
     info!("Both display and LoRa initialized successfully!");
 
@@ -271,7 +273,7 @@ async fn main(_spawner: Spawner) {
     }
     
     let _ = _spawner.spawn(task_send(channel, sent_ack_channel, lora));
-    let _ = _spawner.spawn(task_receive(channel, sent_ack_channel, lora, rng, package_lost_counter));
+    let _ = _spawner.spawn(task_receive(channel, sent_ack_channel, lora, rng, package_lost_counter, current_rssi));
     
     // Main loop
     let mut counter = 0u32;
@@ -304,12 +306,29 @@ async fn main(_spawner: Spawner) {
         let guard = package_lost_counter.lock().await;
         let lost_count = *guard;
         drop(guard);
+
         let mut lost_str = heapless::String::<10>::new();
         write!(&mut lost_str, "{}", lost_count).unwrap();
         
         if let Err(e) = display.text_new_line(&lost_str, 5) {
             error!("Failed to write counter: {:?}", e);
         }
+
+        // Current RSSI
+        display.text_new_line("Current RSSI: ", 6).ok();
+        let rssi_value = {
+            let guard = current_rssi.lock().await;
+            let rssi = *guard as i16; // Convert back to signed
+            drop(guard);
+            rssi
+        };
+
+        let mut rssi_str = heapless::String::<10>::new();
+        write!(&mut rssi_str, "{}", rssi_value).unwrap();
+        if let Err(e) = display.text_new_line(&rssi_str, 7) {
+            error!("Failed to write RSSI: {:?}", e);
+        }
+
 
         if let Err(e) = display.flush() {
             error!("Failed to flush display: {:?}", e);
