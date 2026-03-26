@@ -12,10 +12,8 @@ use haviliar_iot::{
     factory::{display_factory::DisplayFactory, lora_factory::LoraFactory},
     hal::{
         lora::{
-            decode_protocol_message, decode_protocol_payload_utf8,
-            encode_response_time_reply, Lora, OutgoingMessage, PAYLOAD_LENGTH,
-        },
-        peripheral_manager::PeripheralManagerStatic,
+            Lora, OutgoingMessage, PAYLOAD_LENGTH, decode_protocol_message, decode_protocol_payload_utf8, encode_response_time_reply
+        }, peripheral_manager::PeripheralManagerStatic
     },
 };
 use log::*;
@@ -315,7 +313,6 @@ async fn main(_spawner: Spawner) {
         }
 
         // Current RSSI
-        display.text_new_line("Current RSSI: ", 6).ok();
         let rssi_value = {
             let guard = current_rssi.lock().await;
             let rssi = *guard as i16; // Convert back to signed
@@ -323,11 +320,13 @@ async fn main(_spawner: Spawner) {
             rssi
         };
 
-        let mut rssi_str = heapless::String::<10>::new();
-        write!(&mut rssi_str, "{}", rssi_value).unwrap();
-        if let Err(e) = display.text_new_line(&rssi_str, 7) {
-            error!("Failed to write RSSI: {:?}", e);
+        let mut rssi_str = heapless::String::<16>::new();
+        if write!(&mut rssi_str, "RSSI: {}", rssi_value).is_err() {
+            rssi_str.clear();
+            let _ = rssi_str.push_str("RSSI: ERR");
         }
+        
+        display.text_new_line(&rssi_str, 6).ok();
 
 
         if let Err(e) = display.flush() {
