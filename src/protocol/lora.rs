@@ -5,16 +5,16 @@ use minicbor::bytes::ByteSlice;
 use minicbor::encode::write::Cursor;
 use minicbor::{Decode, Encode};
 
+use crate::protocol::message_type::MessageType;
+
 pub const PROTOCOL_VERSION: u8 = 1;
-pub const MSG_TYPE_COUNTER: u8 = 1;
-pub const MSG_TYPE_RESPONSE_TIME: u8 = 2;
 
 #[derive(Debug, Encode, Decode)]
 pub struct LoraEnvelope<'a> {
     #[n(0)]
     pub version: u8,
     #[n(1)]
-    pub msg_type: u8,
+    pub msg_type: MessageType,
     #[n(2)]
     pub seq: u16,
     #[n(3)]
@@ -23,33 +23,57 @@ pub struct LoraEnvelope<'a> {
     pub payload: &'a ByteSlice,
 }
 
+impl<'a> LoraEnvelope<'a> {
+    
+    pub fn new(
+        msg_type: MessageType,
+        seq: u16,
+        timestamp_ms: u32,
+        payload: &'a ByteSlice,
+    ) -> Self {
+        LoraEnvelope {
+            version: PROTOCOL_VERSION,
+            msg_type,
+            seq,
+            timestamp_ms,
+            payload,
+        }
+    }
+}
+
 pub struct OutgoingFrame<const N: usize> {
     pub payload: [u8; N],
     pub len: usize,
 }
 
-pub fn encode_envelope<const N: usize>(msg: &LoraEnvelope) -> Option<OutgoingFrame<N>> {
-    if N < 3 {
-        return None;
+impl<const N: usize> OutgoingFrame<N> {
+    pub fn new(msg: &LoraEnvelope) -> Option<Self> {
+        if N < 3 {
+            return None;
+        }
+
+        // Reserve first 2 bytes for encoded CBOR length to support fixed-size RF payloads.
+        let mut payload = [0u8; N];
+        let mut cursor = Cursor::new(&mut payload[2..]);
+        minicbor::encode(msg, &mut cursor).ok()?;
+        let cbor_len = cursor.position();
+
+        if cbor_len > u16::MAX as usize || cbor_len + 2 > N {
+            return None;
+        }
+
+        let len_prefix = (cbor_len as u16).to_le_bytes();
+        payload[0..2].copy_from_slice(&len_prefix);
+
+        Some(OutgoingFrame {
+            payload,
+            len: cbor_len + 2,
+        })
     }
 
-    // Reserve first 2 bytes for encoded CBOR length to support fixed-size RF payloads.
-    let mut payload = [0u8; N];
-    let mut cursor = Cursor::new(&mut payload[2..]);
-    minicbor::encode(msg, &mut cursor).ok()?;
-    let cbor_len = cursor.position();
-
-    if cbor_len > u16::MAX as usize || cbor_len + 2 > N {
-        return None;
+    pub fn as_slice(&self) -> &[u8] {
+        &self.payload[..self.len]
     }
-
-    let len_prefix = (cbor_len as u16).to_le_bytes();
-    payload[0..2].copy_from_slice(&len_prefix);
-
-    Some(OutgoingFrame {
-        payload,
-        len: cbor_len + 2,
-    })
 }
 
 pub fn decode_envelope<'a>(received: &'a [u8]) -> Option<LoraEnvelope<'a>> {
@@ -62,7 +86,7 @@ pub fn decode_envelope<'a>(received: &'a [u8]) -> Option<LoraEnvelope<'a>> {
         return None;
     }
 
-    let cbor_payload = &received[2..(2 + declared_len)];
+    let cbor_payload: &[u8] = &received[2..(2 + declared_len)];
     minicbor::decode::<LoraEnvelope>(cbor_payload).ok()
 }
 
@@ -79,15 +103,14 @@ pub fn build_response_time_reply<const N: usize>(
         elapsed_ms
     );
 
-    let cbor = LoraEnvelope {
-        version: PROTOCOL_VERSION,
-        msg_type: MSG_TYPE_RESPONSE_TIME,
+    let cbor = LoraEnvelope::new(
+        MessageType::ResponseTime,
         seq,
         timestamp_ms,
-        payload: msg.as_bytes().into(),
-    };
+        msg.as_bytes().into(),
+    );
 
-    encode_envelope(&cbor)
+    OutgoingFrame::new(&cbor)
 }
 
 pub fn build_counter_message<const N: usize>(
@@ -98,15 +121,14 @@ pub fn build_counter_message<const N: usize>(
     let mut msg = String::<32>::new();
     let _ = write!(&mut msg, "counter: {}", counter);
 
-    let cbor = LoraEnvelope {
-        version: PROTOCOL_VERSION,
-        msg_type: MSG_TYPE_COUNTER,
+    let cbor = LoraEnvelope::new(
+        MessageType::Counter,
         seq,
         timestamp_ms,
-        payload: msg.as_bytes().into(),
-    };
+        msg.as_bytes().into(),
+    );
 
-    encode_envelope(&cbor)
+    OutgoingFrame::new(&cbor)
 }
 
 pub fn decode_payload_utf8<'a>(
@@ -114,17 +136,4 @@ pub fn decode_payload_utf8<'a>(
 ) -> core::result::Result<&'a str, &'a [u8]> {
     let payload = message.payload.as_ref();
     core::str::from_utf8(payload).map_err(|_| payload)
-}
-
-pub fn decode_legacy_counter(received: &[u8]) -> Option<u32> {
-    if received.len() < 4 {
-        return None;
-    }
-
-    Some(u32::from_le_bytes([
-        received[0],
-        received[1],
-        received[2],
-        received[3],
-    ]))
 }

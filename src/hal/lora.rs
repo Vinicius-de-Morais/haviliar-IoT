@@ -50,10 +50,6 @@ pub fn decode_protocol_payload_utf8<'a>(
     lora_protocol::decode_payload_utf8(message)
 }
 
-pub fn decode_legacy_counter(received: &[u8]) -> Option<u32> {
-    lora_protocol::decode_legacy_counter(received)
-}
-
 type LoRaInterface<'d> = GenericSx127xInterfaceVariant<
     Output<'d>,
     Input<'d>,
