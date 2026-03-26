@@ -12,7 +12,7 @@ use haviliar_iot::{
     factory::{display_factory::DisplayFactory, lora_factory::LoraFactory},
     hal::{
         lora::{
-            decode_legacy_counter, decode_protocol_message, decode_protocol_payload_utf8,
+            decode_protocol_message, decode_protocol_payload_utf8,
             encode_counter_message, Lora, OutgoingMessage, PAYLOAD_LENGTH,
         },
         peripheral_manager::PeripheralManagerStatic,
@@ -64,7 +64,6 @@ async fn task_receive(
         let mut recv_buffer = [0u8; PAYLOAD_LENGTH];
 
 
-        //TODO: The code below is not working as expected. Fix it.
         // it seems to be blocking the lora structure
         {
             let result = Lora::receive_from_mutex(lora, &mut recv_buffer).await;
@@ -78,7 +77,7 @@ async fn task_receive(
                         if let Some(decoded) = decode_protocol_message(received_payload) {
                             match decode_protocol_payload_utf8(&decoded) {
                                 Ok(text) => info!(
-                                    "Received CBOR message: v={}, type={}, seq={}, ts={}, payload='{}'",
+                                    "Received CBOR message: v={}, type={:?}, seq={}, ts={}, payload='{}'",
                                     decoded.version,
                                     decoded.msg_type,
                                     decoded.seq,
@@ -86,7 +85,7 @@ async fn task_receive(
                                     text
                                 ),
                                 Err(_) => info!(
-                                    "Received CBOR message: v={}, type={}, seq={}, ts={}, payload(bytes)={:?}",
+                                    "Received CBOR message: v={}, type={:?}, seq={}, ts={}, payload(bytes)={:?}",
                                     decoded.version,
                                     decoded.msg_type,
                                     decoded.seq,
@@ -94,8 +93,6 @@ async fn task_receive(
                                     decoded.payload.as_ref()
                                 ),
                             }
-                        } else if let Some(counter) = decode_legacy_counter(received_payload) {
-                            info!("Received legacy counter: {}", counter);
                         } else {
                             info!("Received message (unknown format, len {}): {:?}", len, received_payload);
                         }
