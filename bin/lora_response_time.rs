@@ -119,17 +119,12 @@ async fn task_receive(
                                 decoded.timestamp_ms,
                                 text
                             ),
-                            Err(_) => info!(
-                                "Received CBOR message: v={}, type={:?}, seq={}, ts={}, payload(bytes)={:?}",
-                                decoded.version,
-                                decoded.msg_type,
-                                decoded.seq,
-                                decoded.timestamp_ms,
-                                decoded.payload.as_ref()
-                            ),
+                            Err(_) => {
+                                // Intentionally quiet to keep logs concise.
+                            }
                         }
                     } else {
-                        info!("Received message (unknown format, len {}): {:?}", len, received_payload);
+                        // info!("Received message (unknown format, len {}): {:?}", len, received_payload);
                     }
                 }
                 
@@ -146,7 +141,7 @@ async fn task_receive(
 
                 let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
 
-                info!("Elapsed ms since last response: {}", elapsed_ms);
+                // info!("Elapsed ms since last response: {}", elapsed_ms);
 
                 if had_prev {
                     total_response_ms = total_response_ms.saturating_add(elapsed_ms);
@@ -174,11 +169,11 @@ async fn task_receive(
                     let elapsed_ms = (now - last_at).as_millis();
                     let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
 
-                    info!(
-                        "Receive timeout ({} ms). Packet loss assumed; resending seq {}",
-                        random_timeout_ms,
-                        seq
-                    );
+                    // info!(
+                    //     "Receive timeout ({} ms). Packet loss assumed; resending seq {}",
+                    //     random_timeout_ms,
+                    //     seq
+                    // );
 
                     lost_packets = lost_packets.saturating_add(1);
 
@@ -193,7 +188,7 @@ async fn task_receive(
                         None => error!("Failed to encode CBOR reply after timeout"),
                     }
                 } else {
-                    info!("Receive timeout ({} ms). No previous reply to resend.", random_timeout_ms);
+                    // info!("Receive timeout ({} ms). No previous reply to resend.", random_timeout_ms);
                 }
             }
         }
@@ -269,7 +264,7 @@ async fn main(_spawner: Spawner) {
     if let Err(e) = display.show_message("LoRa + Display OK!") {
         error!("Failed to show initial message: {:?}", e);
     }
-    
+        
     let _ = _spawner.spawn(task_send(channel, sent_ack_channel, lora));
     let _ = _spawner.spawn(task_receive(channel, sent_ack_channel, lora, rng, package_lost_counter, current_rssi));
     

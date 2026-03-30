@@ -185,7 +185,7 @@ impl<'d> Lora<'d>
     }
 
     pub async fn receive(&mut self, buffer: &mut [u8]) -> Result<(u8, lora_phy::mod_params::PacketStatus), RadioError> {
-        info!("Preparing to receive LoRa message...");
+        //info!("Preparing to receive LoRa message...");
         match self.driver.prepare_for_rx(RxMode::Continuous, &self.modulation, &self.rx_packet_params).await {
             Ok(()) => {},
             Err(e) => {
@@ -194,7 +194,7 @@ impl<'d> Lora<'d>
             }
         };
 
-        info!("Waiting for LoRa message...");
+        //info!("Waiting for LoRa message...");
         self.driver.rx(&mut self.rx_packet_params, buffer).await
     }
 
@@ -202,17 +202,17 @@ impl<'d> Lora<'d>
         lora: &'static AsyncMutex<CriticalSectionRawMutex, Lora<'static>>, 
         buffer: &mut [u8]
     ) -> Result<(u8, lora_phy::mod_params::PacketStatus), RadioError> {
-        info!("Attempting to lock Lora mutex for receiving...");
+        //info!("Attempting to lock Lora mutex for receiving...");
         let mut lora_ref  = lora.lock().await;
 
-        info!("Attempting to receive LoRa message from mutex...");
+        //info!("Attempting to receive LoRa message from mutex...");
 
         match lora_ref.receive(buffer).await {
             Ok((length, status)) => {
                 let received_data = &buffer[..length as usize];
 
                 let status_type_name = core::any::type_name_of_val(&status);
-                info!("Received LoRa message (len {}): {:?}, status type: {}", length, received_data, status_type_name);
+                //info!("Received LoRa message (len {}): {:?}, status type: {}", length, received_data, status_type_name);
 
                 return Ok((length, status));
             }
@@ -230,7 +230,7 @@ impl<'d> Lora<'d>
         let mut lora_ref  = lora.lock().await;
             match lora_ref.send(&payload).await {
                 Ok(()) => {
-                    info!("LoRa message sent successfully from mutex");
+                    //info!("LoRa message sent successfully from mutex");
                     return Ok(());
                 }
                 Err(e) => {
