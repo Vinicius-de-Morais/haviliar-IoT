@@ -39,6 +39,7 @@ static SENT_ACK_CHANNEL: StaticCell<SentAckChannel> = StaticCell::new();
 
 static PACKAGE_LOST_COUNTER: StaticCell<AsyncMutex<CriticalSectionRawMutex, u32>> = StaticCell::new();
 static CURRENT_RSSI: StaticCell<AsyncMutex<CriticalSectionRawMutex, u16>> = StaticCell::new();
+static ELAPSED_TIME: StaticCell<AsyncMutex<CriticalSectionRawMutex, u32>> = StaticCell::new();
 
 #[embassy_executor::task]
 async fn task_send(
@@ -72,6 +73,7 @@ async fn task_receive(
     rng: &'static AsyncMutex<CriticalSectionRawMutex, Rng>,
     package_lost_counter: &'static AsyncMutex<CriticalSectionRawMutex, u32>,
     current_rssi: &'static AsyncMutex<CriticalSectionRawMutex, u16>,
+    elapsed_time: &'static AsyncMutex<CriticalSectionRawMutex, u32>,
     ) {
     let tx_sender = tx_channel.sender();
     let ack_receiver = sent_ack_channel.receiver();
@@ -142,6 +144,8 @@ async fn task_receive(
                 let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
 
                 // info!("Elapsed ms since last response: {}", elapsed_ms);
+                let mut elapsed_time_guard = elapsed_time.lock().await;
+                *elapsed_time_guard = elapsed_ms as u32;
 
                 if had_prev {
                     total_response_ms = total_response_ms.saturating_add(elapsed_ms);
@@ -219,7 +223,7 @@ async fn main(_spawner: Spawner) {
         ));
     }
     
-    init_logger(log::LevelFilter::Info);
+    init_logger(log::LevelFilter::Error);
     
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
     let peripheral_manager = PeripheralManagerStatic::init(peripherals);
@@ -258,6 +262,7 @@ async fn main(_spawner: Spawner) {
 
     let package_lost_counter = PACKAGE_LOST_COUNTER.init(AsyncMutex::new(0));
     let current_rssi = CURRENT_RSSI.init(AsyncMutex::new(0));
+    let elapsed_time = ELAPSED_TIME.init(AsyncMutex::new(0));
 
     info!("Both display and LoRa initialized successfully!");
 
@@ -266,7 +271,7 @@ async fn main(_spawner: Spawner) {
     }
         
     let _ = _spawner.spawn(task_send(channel, sent_ack_channel, lora));
-    let _ = _spawner.spawn(task_receive(channel, sent_ack_channel, lora, rng, package_lost_counter, current_rssi));
+    let _ = _spawner.spawn(task_receive(channel, sent_ack_channel, lora, rng, package_lost_counter, current_rssi, elapsed_time));
     
     // Main loop
     let mut counter = 0u32;
@@ -276,22 +281,31 @@ async fn main(_spawner: Spawner) {
             continue;
         }
 
-        // Static text
-        if let Err(e) = display.text_new_line("LoRa + Display OK!", 1) {
-            error!("Failed to write text: {:?}", e);
-        }
+        // // Static text
+        // if let Err(e) = display.text_new_line("LoRa + Display OK!", 1) {
+        //     error!("Failed to write text: {:?}", e);
+        // }
         
-        if let Err(e) = display.text_new_line("Contador:", 2) {
-            error!("Failed to write text: {:?}", e);
-        }
+        // if let Err(e) = display.text_new_line("Contador:", 2) {
+        //     error!("Failed to write text: {:?}", e);
+        // }
 
         // Counter
-        let mut counter_str = heapless::String::<10>::new();
-        write!(&mut counter_str, "{}", counter).unwrap();
+        // let mut counter_str = heapless::String::<10>::new();
+        // write!(&mut counter_str, "{}", counter).unwrap();
         
-        if let Err(e) = display.text_new_line(&counter_str, 3) {
-            error!("Failed to write counter: {:?}", e);
-        }
+        // if let Err(e) = display.text_new_line(&counter_str, 3) {
+        //     error!("Failed to write counter: {:?}", e);
+        // }
+
+        display.text_new_line("Last Response at: ", 1).ok();
+        let guard = elapsed_time.lock().await;
+        let elapsed_time = *guard;
+        drop(guard);
+        let mut elapsed_time_str = heapless::String::<10>::new();
+        write!(&mut elapsed_time_str, "{}", elapsed_time).unwrap();
+        display.text_new_line(&elapsed_time_str, 2).ok();
+
         
         display.text_new_line("Package Lost Counter: ", 4).ok();
 
