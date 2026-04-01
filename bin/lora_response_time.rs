@@ -17,7 +17,7 @@ use haviliar_iot::{
     },
 };
 use log::*;
-use esp_hal::{Async, clock::CpuClock, rng::Rng};
+use esp_hal::{clock::CpuClock, rng::Rng};
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -95,72 +95,84 @@ async fn task_receive(
         FLOOR_RX_TIMEOUT_MS.saturating_add(rand_ms)
     };
     
-    loop{
-        //info!("Waiting for LoRa response...");
-
+    loop {
+        let loop_started_at = Instant::now();
         let mut recv_buffer = [0u8; PAYLOAD_LENGTH];
-        
+        let receive_started_at = Instant::now();
 
         let result = Lora::receive_from_mutex(lora, &mut recv_buffer)
             .with_timeout(Duration::from_millis(random_timeout_ms))
             .await;
 
         match result {
-            Ok(Ok((len, status))) => {
+            Ok(Ok((len, _status))) => {
+                let receive_wait_ms = (Instant::now() - receive_started_at).as_millis();
                 let len_usize = len as usize;
+
                 if len_usize > 0 {
                     let received_payload = &recv_buffer[..len_usize];
+                    let decode_started_at = Instant::now();
 
                     if let Some(decoded) = decode_protocol_message(received_payload) {
-                        match decode_protocol_payload_utf8(&decoded) {
-                            Ok(text) => info!(
-                                "Received CBOR message: v={}, type={:?}, seq={}, ts={}, payload='{}'",
-                                decoded.version,
-                                decoded.msg_type,
-                                decoded.seq,
-                                decoded.timestamp_ms,
-                                text
-                            ),
-                            Err(_) => {
-                                // Intentionally quiet to keep logs concise.
-                            }
-                        }
+                        let _ = decode_protocol_payload_utf8(&decoded);
+                    }
+
+                    let decode_ms = (Instant::now() - decode_started_at).as_millis();
+                    let now = Instant::now();
+                    let had_prev = last_response_at.is_some();
+                    let elapsed_ms = if let Some(last) = last_response_at {
+                        (now - last).as_millis()
                     } else {
-                        // info!("Received message (unknown format, len {}): {:?}", len, received_payload);
+                        0
+                    };
+                    let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
+
+                    if had_prev {
+                        total_response_ms = total_response_ms.saturating_add(elapsed_ms);
+                        response_samples = response_samples.saturating_add(1);
                     }
-                }
-                
-                let mut rssi_guard = current_rssi.lock().await;
-                *rssi_guard = status.rssi as u16;
 
-                let now = Instant::now();
-                let had_prev = last_response_at.is_some();
-                let elapsed_ms = if let Some(last) = last_response_at {
-                    (now - last).as_millis()
-                } else {
-                    0
-                };
+                    let mut rssi_guard = current_rssi.lock().await;
+                    *rssi_guard = _status.rssi as u16;
 
-                let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
+                    let now = Instant::now();
+                    let elapsed_ms = if let Some(last) = last_response_at {
+                        (now - last).as_millis()
+                    } else {
+                        0
+                    };
+                    let mut elapsed_time_guard = elapsed_time.lock().await;
+                    *elapsed_time_guard = elapsed_ms as u32;
 
-                // info!("Elapsed ms since last response: {}", elapsed_ms);
-                let mut elapsed_time_guard = elapsed_time.lock().await;
-                *elapsed_time_guard = elapsed_ms as u32;
+                    let build_reply_started_at = Instant::now();
+                    match encode_response_time_reply(tx_seq, elapsed_ms, timestamp_ms) {
+                        Some(reply) => {
+                            let build_reply_ms = (Instant::now() - build_reply_started_at).as_millis();
+                            let tx_queue_started_at = Instant::now();
+                            tx_sender.send(reply).await;
+                            let tx_queue_ms = (Instant::now() - tx_queue_started_at).as_millis();
 
-                if had_prev {
-                    total_response_ms = total_response_ms.saturating_add(elapsed_ms);
-                    response_samples = response_samples.saturating_add(1);
-                }
+                            let ack_wait_started_at = Instant::now();
+                            ack_receiver.receive().await;
+                            let ack_wait_ms = (Instant::now() - ack_wait_started_at).as_millis();
 
-                match encode_response_time_reply(tx_seq, elapsed_ms, timestamp_ms) {
-                    Some(reply) => {                        
-                        tx_sender.send(reply).await;
-                        ack_receiver.receive().await;
-                        last_sent_seq = Some(tx_seq);
-                        tx_seq = tx_seq.wrapping_add(1);
-                        last_response_at = Some(now);
+                            last_sent_seq = Some(tx_seq);
+                            tx_seq = tx_seq.wrapping_add(1);
+                            last_response_at = Some(now);
+
+                            info!(
+                                "Tempo de processamento: wait_rx={} ms, decode={} ms, build_reply={} ms, queue_tx={} ms, ack_wait={} ms, total_loop={} ms, elapsed_since_last={} ms",
+                                receive_wait_ms,
+                                decode_ms,
+                                build_reply_ms,
+                                tx_queue_ms,
+                                ack_wait_ms,
+                                (Instant::now() - loop_started_at).as_millis(),
+                                elapsed_ms
+                            );
+                        }
+                        None => error!("Failed to encode CBOR reply"),
                     }
-                    None => error!("Failed to encode CBOR reply"),
                 }
             }
             Ok(Err(e)) => {
@@ -173,16 +185,10 @@ async fn task_receive(
                     let elapsed_ms = (now - last_at).as_millis();
                     let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
 
-                    // info!(
-                    //     "Receive timeout ({} ms). Packet loss assumed; resending seq {}",
-                    //     random_timeout_ms,
-                    //     seq
-                    // );
-
                     lost_packets = lost_packets.saturating_add(1);
-
                     let mut counter_guard = package_lost_counter.lock().await;
                     *counter_guard = counter_guard.saturating_add(1);
+
 
                     match encode_response_time_reply(seq, elapsed_ms, timestamp_ms) {
                         Some(reply) => {
@@ -191,25 +197,18 @@ async fn task_receive(
                         }
                         None => error!("Failed to encode CBOR reply after timeout"),
                     }
-                } else {
-                    // info!("Receive timeout ({} ms). No previous reply to resend.", random_timeout_ms);
                 }
             }
         }
 
-        let avg_ms = if response_samples > 0 {
+        let _avg_ms = if response_samples > 0 {
             total_response_ms / response_samples as u64
         } else {
             0
         };
-        info!(
-            "Stats: lost_packets={}, avg_response_ms={} (samples={})",
-            lost_packets,
-            avg_ms,
-            response_samples
-        );
-    }
 
+        let _ = lost_packets;
+    }
 }
 
 #[esp_hal_embassy::main]
@@ -223,7 +222,7 @@ async fn main(_spawner: Spawner) {
         ));
     }
     
-    init_logger(log::LevelFilter::Error);
+    init_logger(log::LevelFilter::Info);
     
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
     let peripheral_manager = PeripheralManagerStatic::init(peripherals);
@@ -264,17 +263,27 @@ async fn main(_spawner: Spawner) {
     let current_rssi = CURRENT_RSSI.init(AsyncMutex::new(0));
     let elapsed_time = ELAPSED_TIME.init(AsyncMutex::new(0));
 
-    info!("Both display and LoRa initialized successfully!");
+    //info!("Both display and LoRa initialized successfully!");
 
     if let Err(e) = display.show_message("LoRa + Display OK!") {
         error!("Failed to show initial message: {:?}", e);
     }
+
+    let payload = &mut [0u8; PAYLOAD_LENGTH];
+
+    match Lora::send_from_mutex(lora, payload).await {
+        Ok(_) => {
+            //info!("LoRa reply sent successfully");
+        }
+        Err(e) => error!("Failed to send LoRa reply: {:?}", e),
+    }
         
     let _ = _spawner.spawn(task_send(channel, sent_ack_channel, lora));
     let _ = _spawner.spawn(task_receive(channel, sent_ack_channel, lora, rng, package_lost_counter, current_rssi, elapsed_time));
+    //let _ = _spawner.spawn(task_receive(channel, sent_ack_channel, lora, rng));
     
     // Main loop
-    let mut counter = 0u32;
+    let mut _counter = 0u32;
     loop {
         if let Err(e) = display.clear() {
             error!("Failed to clear display: {:?}", e);
@@ -342,7 +351,7 @@ async fn main(_spawner: Spawner) {
             error!("Failed to flush display: {:?}", e);
         }
         
-        counter += 1;
+        _counter += 1;
 
         Timer::after_millis(1000).await;
     }
