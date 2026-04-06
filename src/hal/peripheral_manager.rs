@@ -1,6 +1,6 @@
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use esp_hal::peripherals::{Peripherals, I2C0, SPI2, GPIO4, GPIO5, GPIO19, GPIO27, GPIO26, GPIO18, GPIO14, GPIO15, GPIO16, GPIO13, TIMG0, TIMG1, RNG, WIFI, LEDC};
+use esp_hal::peripherals::{Peripherals, I2C0, SPI2, GPIO0, GPIO4, GPIO5, GPIO19, GPIO27, GPIO26, GPIO18, GPIO14, GPIO15, GPIO16, GPIO13, TIMG0, TIMG1, RNG, WIFI, LEDC};
 use esp_hal::timer::timg::TimerGroup;
 use core::cell::RefCell;
 use core::option::Option;
@@ -39,6 +39,10 @@ pub struct ServoPeripherals {
     pub ledc: LEDC<'static>,
 }
 
+pub struct ButtonPeripherals {
+    pub prg: GPIO0<'static>,
+}
+
 /// Centralized peripheral manager
 pub struct PeripheralManager {
     display_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<DisplayPeripherals>>>,
@@ -46,6 +50,7 @@ pub struct PeripheralManager {
     wifi_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<WifiPeripherals>>>,
     time_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<TIMG1<'static>>>>,
     servo_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<ServoPeripherals>>>,
+    button_peripherals: Mutex<CriticalSectionRawMutex, RefCell<Option<ButtonPeripherals>>>,
 }
 
 impl PeripheralManager {
@@ -77,6 +82,10 @@ impl PeripheralManager {
             pin: peripherals.GPIO13,
             ledc: peripherals.LEDC,
         };
+
+        let button_peripherals = ButtonPeripherals {
+            prg: peripherals.GPIO0,
+        };
         
         Self {
             display_peripherals: Mutex::new(RefCell::new(Some(display_peripherals))),
@@ -84,6 +93,7 @@ impl PeripheralManager {
             wifi_peripherals: Mutex::new(RefCell::new(Some(wifi_peripherals))),
             time_peripherals: Mutex::new(RefCell::new(Some(peripherals.TIMG1))),
             servo_peripherals: Mutex::new(RefCell::new(Some(servo_peripherals))),
+            button_peripherals: Mutex::new(RefCell::new(Some(button_peripherals))),
         }
     }
 
@@ -107,6 +117,12 @@ impl PeripheralManager {
 
     pub fn take_servo_peripherals(&self) -> Option<ServoPeripherals> {
         self.servo_peripherals.lock(|cell| {
+            cell.borrow_mut().take()
+        })
+    }
+
+    pub fn take_button_peripherals(&self) -> Option<ButtonPeripherals> {
+        self.button_peripherals.lock(|cell| {
             cell.borrow_mut().take()
         })
     }
