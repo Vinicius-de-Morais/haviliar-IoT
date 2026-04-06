@@ -28,6 +28,11 @@ path = "bin/lora_response_time.rs"
 harness = false # do no
 
 [[bin]]
+name = "lora_gateway_single_task"
+path = "bin/lora_gateway_single_task.rs"
+harness = false
+
+[[bin]]
 name = "lora-display"
 path = "bin/lora-display.rs"
 harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors

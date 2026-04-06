@@ -7,6 +7,7 @@ use lora_phy::{
     LoRa as LoRaPhy, RxMode, iv::{GenericSx126xInterfaceVariant}, mod_params::{Bandwidth, CodingRate, ModulationParams, PacketParams, RadioError, SpreadingFactor}, sx126x::{self, Sx126x, Sx1262, TcxoCtrlVoltage}
 };
 use embassy_time::Delay as EmbassyDelay;
+use embassy_time::Instant;
 use log::*;
 use core::result::Result::Err;
 use esp_hal::peripherals::{GPIO14, GPIO12, GPIO8, GPIO13};
@@ -202,17 +203,21 @@ impl<'d> Lora<'d>
         lora: &'static AsyncMutex<CriticalSectionRawMutex, Lora<'static>>, 
         buffer: &mut [u8]
     ) -> Result<(u8, lora_phy::mod_params::PacketStatus), RadioError> {
-        //info!("Attempting to lock Lora mutex for receiving...");
+        let lock_started_at = Instant::now();
         let mut lora_ref  = lora.lock().await;
+        let lock_wait_ms = (Instant::now() - lock_started_at).as_millis();
 
-        //info!("Attempting to receive LoRa message from mutex...");
+        let receive_started_at = Instant::now();
 
         match lora_ref.receive(buffer).await {
             Ok((length, status)) => {
-                let received_data = &buffer[..length as usize];
-
-                let status_type_name = core::any::type_name_of_val(&status);
-                //info!("Received LoRa message (len {}): {:?}, status type: {}", length, received_data, status_type_name);
+                let radio_rx_ms = (Instant::now() - receive_started_at).as_millis();
+                info!(
+                    "LoRa RX timing: lock_wait={} ms, radio_rx={} ms, len={}",
+                    lock_wait_ms,
+                    radio_rx_ms,
+                    length
+                );
 
                 return Ok((length, status));
             }
@@ -227,16 +232,26 @@ impl<'d> Lora<'d>
         lora: &'static AsyncMutex<CriticalSectionRawMutex, Lora<'static>>, 
         payload: &mut [u8]
     ) -> Result<(), RadioError> {
+        let lock_started_at = Instant::now();
         let mut lora_ref  = lora.lock().await;
-            match lora_ref.send(&payload).await {
-                Ok(()) => {
-                    //info!("LoRa message sent successfully from mutex");
-                    return Ok(());
-                }
-                Err(e) => {
-                    error!("Failed to send LoRa message from mutex: {:?}", e);
-                    return Err(e);
-                }
+        let lock_wait_ms = (Instant::now() - lock_started_at).as_millis();
+        let tx_started_at = Instant::now();
+
+        match lora_ref.send(&payload).await {
+            Ok(()) => {
+                let radio_tx_ms = (Instant::now() - tx_started_at).as_millis();
+                info!(
+                    "LoRa TX timing: lock_wait={} ms, radio_tx={} ms, payload_len={}",
+                    lock_wait_ms,
+                    radio_tx_ms,
+                    payload.len()
+                );
+                return Ok(());
             }
+            Err(e) => {
+                error!("Failed to send LoRa message from mutex: {:?}", e);
+                return Err(e);
+            }
+        }
     }
 }
