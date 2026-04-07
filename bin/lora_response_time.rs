@@ -12,12 +12,12 @@ use haviliar_iot::{
     factory::{display_factory::DisplayFactory, lora_factory::LoraFactory},
     hal::{
         lora::{
-            Lora, OutgoingMessage, PAYLOAD_LENGTH, decode_protocol_message, decode_protocol_payload_utf8, encode_response_time_reply, encode_counter_message
+            Lora, OutgoingMessage, PAYLOAD_LENGTH, decode_protocol_message, decode_protocol_payload_utf8, encode_response_time_reply
         }, peripheral_manager::PeripheralManagerStatic
     },
 };
 use log::*;
-use esp_hal::{clock::CpuClock, gpio::{Input, InputConfig}, rng::Rng};
+use esp_hal::{clock::CpuClock, rng::Rng};
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -27,10 +27,6 @@ static mut HEAP: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZ
 
 const FLOOR_RX_TIMEOUT_MS: u64 = 5000;
 const CEIL_RX_TIMEOUT_MS: u64 = 6000;
-
-const PRG_BUTTON_ACTIVE_LOW: bool = true;
-const PRG_BUTTON_DEBOUNCE_MS: u64 = 30;
-const PRG_BUTTON_REPEAT_GUARD_MS: u64 = 300;
 
 static LORA: StaticCell<AsyncMutex<CriticalSectionRawMutex, Lora<'static>>> = StaticCell::new();
 static RNG: StaticCell<AsyncMutex<CriticalSectionRawMutex, Rng>> = StaticCell::new();
@@ -44,54 +40,6 @@ static SENT_ACK_CHANNEL: StaticCell<SentAckChannel> = StaticCell::new();
 static PACKAGE_LOST_COUNTER: StaticCell<AsyncMutex<CriticalSectionRawMutex, u32>> = StaticCell::new();
 static CURRENT_RSSI: StaticCell<AsyncMutex<CriticalSectionRawMutex, u16>> = StaticCell::new();
 static ELAPSED_TIME: StaticCell<AsyncMutex<CriticalSectionRawMutex, u32>> = StaticCell::new();
-
-#[embassy_executor::task]
-async fn task_button(tx_channel: &'static LoRaChannel, mut button: Input<'static>) {
-    let tx_sender = tx_channel.sender();
-    let mut seq: u16 = 0;
-    let mut counter: u32 = 0;
-
-    loop {
-        let pressed = if PRG_BUTTON_ACTIVE_LOW {
-            button.is_low()
-        } else {
-            button.is_high()
-        };
-
-        if pressed {
-            Timer::after_millis(PRG_BUTTON_DEBOUNCE_MS).await;
-
-            let pressed_confirmed = if PRG_BUTTON_ACTIVE_LOW {
-                button.is_low()
-            } else {
-                button.is_high()
-            };
-
-            if pressed_confirmed {
-                let now = Instant::now();
-                let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
-
-                info!("Button pressed! Sending counter message: seq={}, counter={}, timestamp_ms={}", seq, counter, timestamp_ms);
-
-                if let Some(reply) = encode_counter_message(seq, counter, timestamp_ms) {
-                    tx_sender.send(reply).await;
-                    seq = seq.wrapping_add(1);
-                    counter = counter.wrapping_add(1);
-                } else {
-                    error!("Failed to encode counter message from button");
-                }
-
-                while if PRG_BUTTON_ACTIVE_LOW { button.is_low() } else { button.is_high() } {
-                    Timer::after_millis(10).await;
-                }
-
-                Timer::after_millis(PRG_BUTTON_REPEAT_GUARD_MS).await;
-            }
-        }
-
-        Timer::after_millis(10).await;
-    }
-}
 
 #[embassy_executor::task]
 async fn task_send(
@@ -259,7 +207,7 @@ async fn task_receive(
             0
         };
 
-        let _ = lost_packets;    
+        let _ = lost_packets;
     }
 }
 
@@ -315,9 +263,6 @@ async fn main(_spawner: Spawner) {
     let current_rssi = CURRENT_RSSI.init(AsyncMutex::new(0));
     let elapsed_time = ELAPSED_TIME.init(AsyncMutex::new(0));
 
-    let button_peripherals = peripheral_manager.take_button_peripherals().unwrap();
-    let button = Input::new(button_peripherals.prg, InputConfig::default());
-
     //info!("Both display and LoRa initialized successfully!");
 
     if let Err(e) = display.show_message("LoRa + Display OK!") {
@@ -335,7 +280,6 @@ async fn main(_spawner: Spawner) {
         
     let _ = _spawner.spawn(task_send(channel, sent_ack_channel, lora));
     let _ = _spawner.spawn(task_receive(channel, sent_ack_channel, lora, rng, package_lost_counter, current_rssi, elapsed_time));
-    let _ = _spawner.spawn(task_button(channel, button));
     //let _ = _spawner.spawn(task_receive(channel, sent_ack_channel, lora, rng));
     
     // Main loop
