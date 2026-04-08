@@ -18,6 +18,7 @@ use haviliar_iot::{
 };
 use log::*;
 use esp_hal::{clock::CpuClock, rng::Rng};
+use minicbor::decode::info;
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -126,8 +127,6 @@ async fn task_receive(
                         0
                     };
                     let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
-                let mut elapsed_time_guard = elapsed_time.lock().await;
-                *elapsed_time_guard = elapsed_ms as u32;
 
                     if had_prev {
                         total_response_ms = total_response_ms.saturating_add(elapsed_ms);
@@ -137,12 +136,6 @@ async fn task_receive(
                     let mut rssi_guard = current_rssi.lock().await;
                     *rssi_guard = _status.rssi as u16;
 
-                    let now = Instant::now();
-                    let elapsed_ms = if let Some(last) = last_response_at {
-                        (now - last).as_millis()
-                    } else {
-                        0
-                    };
                     let mut elapsed_time_guard = elapsed_time.lock().await;
                     *elapsed_time_guard = elapsed_ms as u32;
 
@@ -224,7 +217,7 @@ async fn main(_spawner: Spawner) {
         ));
     }
     
-    init_logger(log::LevelFilter::Error);
+    init_logger(log::LevelFilter::Info);
     
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
     let peripheral_manager = PeripheralManagerStatic::init(peripherals);
@@ -279,11 +272,9 @@ async fn main(_spawner: Spawner) {
         }
         Err(e) => error!("Failed to send LoRa reply: {:?}", e),
     }
-        
     let _ = _spawner.spawn(task_send(channel, sent_ack_channel, lora));
     let _ = _spawner.spawn(task_receive(channel, sent_ack_channel, lora, rng, package_lost_counter, current_rssi, elapsed_time));
     //let _ = _spawner.spawn(task_receive(channel, sent_ack_channel, lora, rng));
-    
     // Main loop
     let mut _counter = 0u32;
     loop {
