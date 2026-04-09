@@ -112,22 +112,22 @@ async fn task_receive(
             Ok(Ok((envelope, status))) => {
                 let receive_wait_ms = (Instant::now() - receive_started_at).as_millis();
 
-                let now = Instant::now();
-                let had_prev = last_response_at.is_some();
-                let elapsed_ms = if let Some(last) = last_response_at {
-                    (now - last).as_millis()
-                } else {
-                    0
-                };
-                let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
+                    let now = Instant::now();
+                    let had_prev = last_response_at.is_some();
+                    let elapsed_ms = if let Some(last) = last_response_at {
+                        (now - last).as_millis()
+                    } else {
+                        0
+                    };
+                    let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
 
                 if had_prev {
                     total_response_ms = total_response_ms.saturating_add(elapsed_ms);
                     response_samples = response_samples.saturating_add(1);
                 }
 
-                let mut rssi_guard = current_rssi.lock().await;
-                *rssi_guard = status.rssi as u16;
+                    let mut rssi_guard = current_rssi.lock().await;
+                    *rssi_guard = status.rssi as u16;
 
                 let now = Instant::now();
                 let elapsed_ms = if let Some(last) = last_response_at {
