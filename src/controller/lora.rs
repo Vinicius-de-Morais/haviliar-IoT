@@ -65,11 +65,12 @@ impl LoraController {
                         match LoraParser::decode_payload_utf8(&decoded) {
                             Ok(text) => {
                                 info!(
-                                    "Received CBOR message: v={}, type={:?}, seq={}, ts={}, payload='{}'",
+                                    "Received CBOR message: v={}, type={:?}, seq={}, ts={}, et{},payload='{}'",
                                     decoded.version,
                                     decoded.msg_type,
                                     decoded.seq,
                                     decoded.timestamp_ms,
+                                    decoded.elapsed_ms,
                                     text
                                 );
 
@@ -77,11 +78,12 @@ impl LoraController {
                             },
                             Err(_) => {
                                 info!(
-                                    "Received CBOR message: v={}, type={:?}, seq={}, ts={}, payload(bytes)={:?}",
+                                    "Received CBOR message: v={}, type={:?}, seq={}, ts={}, et{},payload='{:?}'",
                                     decoded.version,
                                     decoded.msg_type,
                                     decoded.seq,
                                     decoded.timestamp_ms,
+                                    decoded.elapsed_ms,
                                     decoded.payload.as_ref()
                                 );
 
