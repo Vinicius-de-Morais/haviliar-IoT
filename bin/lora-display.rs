@@ -25,10 +25,7 @@ use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-const HEAP_SIZE: usize = 64 * 1024; // 64KB heap
-static mut HEAP: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
-
-static LORA_CONTROLLER: StaticCell<AsyncMutex<CriticalSectionRawMutex, LoraController>> = StaticCell::new();
+static LORA: StaticCell<AsyncMutex<CriticalSectionRawMutex, Lora<'static>>> = StaticCell::new();
 //static DISPLAY: StaticCell<AsyncMutex<CriticalSectionRawMutex, Display<'static>>> = StaticCell::new();
 type LoRaChannel = Channel<CriticalSectionRawMutex, OutgoingMessage, 1>;
 static LORA_CHANNEL: StaticCell<LoRaChannel> = StaticCell::new();

@@ -9,10 +9,7 @@ use embassy_time::{Duration, Instant, Timer, WithTimeout};
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
 use haviliar_iot::{
-    controller::lora::LoraController,
-    factory::{display_factory::DisplayFactory, lora_factory::LoraFactory},
-    hal::{lora::PAYLOAD_LENGTH, peripheral_manager::PeripheralManagerStatic},
-    protocol::{lora::{LoraEnvelope, MAX_APP_PAYLOAD}, message_type::MessageType},
+    controller::lora::LoraController, factory::{display_factory::DisplayFactory, lora_factory::LoraFactory}, hal::{lora::{OutgoingMessage, PAYLOAD_LENGTH}, peripheral_manager::PeripheralManagerStatic}, protocol::{lora::LoraEnvelope, message_type::MessageType}
 };
 use log::*;
 use esp_hal::{clock::CpuClock, rng::Rng};
@@ -254,7 +251,7 @@ async fn main(_spawner: Spawner) {
     if let Err(e) = display.show_message("LoRa + Display OK!") {
         error!("Failed to show initial message: {:?}", e);
     }
-
+        
     let _ = _spawner.spawn(task_send(channel, sent_ack_channel, lora));
     let _ = _spawner.spawn(task_receive(channel, sent_ack_channel, lora, rng, package_lost_counter, current_rssi, elapsed_time));
     
