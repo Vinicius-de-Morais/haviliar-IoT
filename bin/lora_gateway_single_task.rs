@@ -20,7 +20,7 @@ use haviliar_iot::{
     controller::mqtt::MqttController,
     hal::{
         lora::{
-            decode_protocol_message, decode_protocol_payload_utf8, Lora, OutgoingMessage,
+            Lora, OutgoingMessage,
             PAYLOAD_LENGTH,
         },
         peripheral_manager::PeripheralManagerStatic,
@@ -97,7 +97,7 @@ static MQTT_CLIENT_CELL: StaticCell<Mutex<CriticalSectionRawMutex, MqttControlle
     StaticCell::new();
 
 fn encode_forward_frame(seq: u16, timestamp_ms: u32, payload: &[u8]) -> Option<OutgoingMessage> {
-    let envelope = LoraEnvelope::new(MessageType::ContinuousPackage, seq, timestamp_ms, payload.into());
+    let envelope = LoraEnvelope::new(MessageType::Reply, seq, timestamp_ms, 0, payload.into());
     OutgoingMessage::new(&envelope)
 }
 
@@ -167,43 +167,43 @@ async fn task_lora_gateway(
                 if len_usize > 0 {
                     let received_payload = &recv_buffer[..len_usize];
 
-                    if let Some(decoded) = decode_protocol_message(received_payload) {
-                        match decode_protocol_payload_utf8(&decoded) {
-                            Ok(text) => {
-                                info!(
-                                    "LoRa RX: seq={}, ts={}, payload='{}'",
-                                    decoded.seq, decoded.timestamp_ms, text
-                                );
-                            }
-                            Err(_) => {
-                                info!(
-                                    "LoRa RX: seq={}, ts={}, payload(bin)",
-                                    decoded.seq, decoded.timestamp_ms
-                                );
-                            }
-                        }
+                    // if let Some(decoded) = decode_protocol_message(received_payload) {
+                    //     match decode_protocol_payload_utf8(&decoded) {
+                    //         Ok(text) => {
+                    //             info!(
+                    //                 "LoRa RX: seq={}, ts={}, payload='{}'",
+                    //                 decoded.seq, decoded.timestamp_ms, text
+                    //             );
+                    //         }
+                    //         Err(_) => {
+                    //             info!(
+                    //                 "LoRa RX: seq={}, ts={}, payload(bin)",
+                    //                 decoded.seq, decoded.timestamp_ms
+                    //             );
+                    //         }
+                    //     }
 
-                        if let Some(ref pending) = pending_forward {
-                            if decoded.seq == pending.request.expected_ack_seq {
-                                let elapsed_ms =
-                                    (Instant::now() - pending.sent_at).as_millis().min(u32::MAX as u64)
-                                        as u32;
+                    //     if let Some(ref pending) = pending_forward {
+                    //         if decoded.seq == pending.request.expected_ack_seq {
+                    //             let elapsed_ms =
+                    //                 (Instant::now() - pending.sent_at).as_millis().min(u32::MAX as u64)
+                    //                     as u32;
 
-                                let result = ForwardResult {
-                                    request_id: pending.request.request_id,
-                                    seq: pending.request.expected_ack_seq,
-                                    kind: ForwardResultKind::AckReceived,
-                                    elapsed_ms,
-                                };
+                    //             let result = ForwardResult {
+                    //                 request_id: pending.request.request_id,
+                    //                 seq: pending.request.expected_ack_seq,
+                    //                 kind: ForwardResultKind::AckReceived,
+                    //                 elapsed_ms,
+                    //             };
 
-                                if result_tx.try_send(result).is_err() {
-                                    error!("Fila LORA->MQTT cheia: nao foi possivel publicar AckReceived");
-                                }
+                    //             if result_tx.try_send(result).is_err() {
+                    //                 error!("Fila LORA->MQTT cheia: nao foi possivel publicar AckReceived");
+                    //             }
 
-                                pending_forward = None;
-                            }
-                        }
-                    }
+                    //             pending_forward = None;
+                    //         }
+                    //     }
+                    // }
                 }
             }
             Ok(Err(e)) => {
@@ -280,6 +280,7 @@ async fn task_mqtt_ingress(
 
     loop {
         let mut mqtt_controller = mqtt_controller_mutex.lock().await;
+        
         match mqtt_controller.receive_message().await {
             Ok((_topic, payload)) => {
                 let mut payload_copy = heapless::Vec::<u8, PAYLOAD_LENGTH>::new();

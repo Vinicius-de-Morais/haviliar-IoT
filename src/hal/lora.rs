@@ -22,31 +22,6 @@ pub const PAYLOAD_LENGTH: usize = 255;
 pub type OutgoingMessage = lora_protocol::OutgoingFrame<PAYLOAD_LENGTH>;
 pub type DecodedProtocolMessage<'a> = lora_protocol::LoraEnvelope<'a>;
 
-pub fn encode_response_time_reply(
-    seq: u16,
-    elapsed_ms: u64,
-    timestamp_ms: u32,
-) -> Option<OutgoingMessage> {
-    lora_protocol::build_response_time_reply::<PAYLOAD_LENGTH>(seq, elapsed_ms, timestamp_ms)
-}
-
-pub fn encode_counter_message(
-    seq: u16,
-    counter: u32,
-    timestamp_ms: u32,
-) -> Option<OutgoingMessage> {
-    lora_protocol::build_counter_message::<PAYLOAD_LENGTH>(seq, counter, timestamp_ms)
-}
-
-pub fn decode_protocol_message<'a>(received: &'a [u8]) -> Option<DecodedProtocolMessage<'a>> {
-    lora_protocol::decode_envelope(received)
-}
-
-pub fn decode_protocol_payload_utf8<'a>(
-    message: &'a DecodedProtocolMessage<'a>,
-) -> core::result::Result<&'a str, &'a [u8]> {
-    lora_protocol::decode_payload_utf8(message)
-}
 
 type LoRaInterface<'d> = GenericSx126xInterfaceVariant<
     Output<'d>,

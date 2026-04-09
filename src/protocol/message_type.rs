@@ -10,4 +10,7 @@ pub enum MessageType {
 
     #[n(2)]
     ContinuousPackage = 2,
+
+    #[n(3)]
+    Reply = 3,
 }
