@@ -9,12 +9,15 @@ use embassy_time::{Instant, Timer};
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
 use haviliar_iot::{
-    controller::lora::LoraController, factory::{display_factory::DisplayFactory, lora_factory::LoraFactory}, hal::{
+    controller::lora::{self, LoraController},
+    factory::{display_factory::DisplayFactory, lora_factory::LoraFactory},
+    hal::{
         lora::{
             Lora, OutgoingMessage, PAYLOAD_LENGTH,
         },
         peripheral_manager::PeripheralManagerStatic,
-    }, protocol::message_type::MessageType
+    },
+    protocol::{lora::MAX_APP_PAYLOAD, message_type::MessageType},
 };
 use log::*;
 use esp_hal::clock::CpuClock;
@@ -166,7 +169,9 @@ async fn main(_spawner: Spawner) {
         let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
         let sender = channel.sender();
 
-        let payload = [counter as u8; PAYLOAD_LENGTH]; // Example payload with counter value
+        // Usa somente o tamanho máximo de payload de aplicação suportado
+        // pelo envelope CBOR dentro do frame LoRa.
+        let payload = [counter as u8; MAX_APP_PAYLOAD];
         let mut lora_ref = lora_controller_mutex.lock().await;
 
         let _ = lora_ref.send_message(MessageType::Counter, tx_seq, timestamp_ms, 0 /*elapsed_ms*/, &payload).await;
