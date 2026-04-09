@@ -5,6 +5,7 @@ use minicbor::bytes::ByteSlice;
 use minicbor::encode::write::Cursor;
 use minicbor::{Decode, Encode};
 
+use crate::hal::lora::PAYLOAD_LENGTH;
 use crate::protocol::message_type::MessageType;
 
 pub const PROTOCOL_VERSION: u8 = 1;
@@ -18,8 +19,10 @@ pub struct LoraEnvelope<'a> {
     #[n(2)]
     pub seq: u16,
     #[n(3)]
-    pub timestamp_ms: u32,
+    pub timestamp_ms: u32,    
     #[n(4)]
+    pub elapsed_ms: u32,
+    #[n(5)]
     pub payload: &'a ByteSlice,
 }
 
@@ -29,15 +32,39 @@ impl<'a> LoraEnvelope<'a> {
         msg_type: MessageType,
         seq: u16,
         timestamp_ms: u32,
+        elapsed_ms: u32,
         payload: &'a ByteSlice,
     ) -> Self {
         LoraEnvelope {
             version: PROTOCOL_VERSION,
             msg_type,
-            seq,
             timestamp_ms,
+            elapsed_ms,
+            seq,
             payload,
         }
+    }
+
+    pub fn new_version(
+        version: u8,
+        msg_type: MessageType,
+        seq: u16,
+        timestamp_ms: u32,
+        elapsed_ms: u32,
+        payload: &'a ByteSlice,
+    ) -> Self {
+        LoraEnvelope {
+            version,
+            msg_type,
+            timestamp_ms,
+            elapsed_ms,
+            seq,
+            payload,
+        }
+    }
+
+    pub fn into_outgoing(&self) -> Option<OutgoingFrame<PAYLOAD_LENGTH>> {
+        OutgoingFrame::new(self)
     }
 }
 
@@ -76,64 +103,45 @@ impl<const N: usize> OutgoingFrame<N> {
     }
 }
 
-pub fn decode_envelope<'a>(received: &'a [u8]) -> Option<LoraEnvelope<'a>> {
-    if received.len() < 2 {
-        return None;
+pub struct LoraParser;
+
+impl LoraParser {
+    pub fn decode_envelope<'a>(received: &'a [u8]) -> Option<LoraEnvelope<'a>> {
+        if received.len() < 2 {
+            return None;
+        }
+
+        let declared_len = u16::from_le_bytes([received[0], received[1]]) as usize;
+        if declared_len == 0 || declared_len + 2 > received.len() {
+            return None;
+        }
+
+        let cbor_payload: &[u8] = &received[2..(2 + declared_len)];
+        minicbor::decode::<LoraEnvelope>(cbor_payload).ok()
     }
 
-    let declared_len = u16::from_le_bytes([received[0], received[1]]) as usize;
-    if declared_len == 0 || declared_len + 2 > received.len() {
-        return None;
+    pub fn decode_payload_utf8<'a>(
+        message: &'a LoraEnvelope<'a>,
+    ) -> core::result::Result<&'a str, &'a [u8]> {
+        let payload = message.payload.as_ref();
+        core::str::from_utf8(payload).map_err(|_| payload)
     }
 
-    let cbor_payload: &[u8] = &received[2..(2 + declared_len)];
-    minicbor::decode::<LoraEnvelope>(cbor_payload).ok()
-}
+    pub fn encode_envelope<const N: usize>(
+        msg_type: MessageType,
+        seq: u16,
+        timestamp_ms: u32,
+        elapsed_ms: u32,
+        payload: &[u8],
+    ) -> Option<OutgoingFrame<N>> {
+        let envelope = LoraEnvelope::new(
+            msg_type, 
+            seq, 
+            timestamp_ms,
+            elapsed_ms,
+            payload.into()
+        );
 
-pub fn build_response_time_reply<const N: usize>(
-    seq: u16,
-    elapsed_ms: u64,
-    timestamp_ms: u32,
-) -> Option<OutgoingFrame<N>> {
-    let mut msg = String::<96>::new();
-
-    let _ = write!(
-        &mut msg,
-        "time elapse since last response: {} ms",
-        elapsed_ms
-    );
-
-    let cbor = LoraEnvelope::new(
-        MessageType::ResponseTime,
-        seq,
-        timestamp_ms,
-        msg.as_bytes().into(),
-    );
-
-    OutgoingFrame::new(&cbor)
-}
-
-pub fn build_counter_message<const N: usize>(
-    seq: u16,
-    counter: u32,
-    timestamp_ms: u32,
-) -> Option<OutgoingFrame<N>> {
-    let mut msg = String::<32>::new();
-    let _ = write!(&mut msg, "counter: {}", counter);
-
-    let cbor = LoraEnvelope::new(
-        MessageType::Counter,
-        seq,
-        timestamp_ms,
-        msg.as_bytes().into(),
-    );
-
-    OutgoingFrame::new(&cbor)
-}
-
-pub fn decode_payload_utf8<'a>(
-    message: &'a LoraEnvelope<'a>,
-) -> core::result::Result<&'a str, &'a [u8]> {
-    let payload = message.payload.as_ref();
-    core::str::from_utf8(payload).map_err(|_| payload)
+        OutgoingFrame::new(&envelope)
+    }
 }

@@ -9,14 +9,12 @@ use embassy_time::{Instant, Timer};
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
 use haviliar_iot::{
-    factory::{display_factory::DisplayFactory, lora_factory::LoraFactory},
-    hal::{
+    controller::lora::LoraController, factory::{display_factory::DisplayFactory, lora_factory::LoraFactory}, hal::{
         lora::{
-            decode_protocol_message, decode_protocol_payload_utf8,
-            encode_counter_message, Lora, OutgoingMessage, PAYLOAD_LENGTH,
+            Lora, OutgoingMessage, PAYLOAD_LENGTH,
         },
         peripheral_manager::PeripheralManagerStatic,
-    },
+    }, protocol::message_type::MessageType
 };
 use log::*;
 use esp_hal::clock::CpuClock;
@@ -24,7 +22,7 @@ use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-static LORA: StaticCell<AsyncMutex<CriticalSectionRawMutex, Lora<'static>>> = StaticCell::new();
+static LORA_CONTROLLER: StaticCell<AsyncMutex<CriticalSectionRawMutex, LoraController>> = StaticCell::new();
 //static DISPLAY: StaticCell<AsyncMutex<CriticalSectionRawMutex, Display<'static>>> = StaticCell::new();
 type LoRaChannel = Channel<CriticalSectionRawMutex, OutgoingMessage, 1>;
 static LORA_CHANNEL: StaticCell<LoRaChannel> = StaticCell::new();
@@ -32,7 +30,7 @@ static LORA_CHANNEL: StaticCell<LoRaChannel> = StaticCell::new();
 #[embassy_executor::task]
 async fn task_send(
     channel: &'static LoRaChannel,
-    lora: &'static AsyncMutex<CriticalSectionRawMutex, Lora<'static>>
+    lora: &'static AsyncMutex<CriticalSectionRawMutex, LoraController>
     ) {
     
     let receiver = channel.receiver();
@@ -41,16 +39,19 @@ async fn task_send(
         let mut message = receiver.receive().await;
         let payload = &mut message.payload[..message.len];
 
-        match Lora::send_from_mutex(lora, payload).await {
-            Ok(_) => info!("LoRa message sent successfully"),
-            Err(e) => error!("Failed to send LoRa message: {:?}", e),
-        }
+        lora.lock().await.send_message(
+            haviliar_iot::protocol::message_type::MessageType::Counter,
+            1, // Using first byte of payload as sequence for simplicity
+            Instant::now().as_millis() as u32,
+            0, // Elapsed time can be set to 0 for this example
+            payload,
+        ).await.unwrap_or_else(|e| error!("Failed to send LoRa message: {:?}", e));
     }
 }
 
 #[embassy_executor::task]
 async fn task_receive(
-    lora: &'static AsyncMutex<CriticalSectionRawMutex, Lora<'static>>
+    lora: &'static AsyncMutex<CriticalSectionRawMutex, LoraController>
     ) {
     
     loop{
@@ -63,39 +64,9 @@ async fn task_receive(
 
         // it seems to be blocking the lora structure
         {
-            let result = Lora::receive_from_mutex(lora, &mut recv_buffer).await;
-
-            match result {
-                Ok((len, status)) => {
-                    let len_usize = len as usize;
-                    if len_usize > 0 {
-                        let received_payload = &recv_buffer[..len_usize];
-
-                        if let Some(decoded) = decode_protocol_message(received_payload) {
-                            match decode_protocol_payload_utf8(&decoded) {
-                                Ok(text) => info!(
-                                    "Received CBOR message: v={}, type={:?}, seq={}, ts={}, payload='{}'",
-                                    decoded.version,
-                                    decoded.msg_type,
-                                    decoded.seq,
-                                    decoded.timestamp_ms,
-                                    text
-                                ),
-                                Err(_) => info!(
-                                    "Received CBOR message: v={}, type={:?}, seq={}, ts={}, payload(bytes)={:?}",
-                                    decoded.version,
-                                    decoded.msg_type,
-                                    decoded.seq,
-                                    decoded.timestamp_ms,
-                                    decoded.payload.as_ref()
-                                ),
-                            }
-                        } else {
-                            info!("Received message (unknown format, len {}): {:?}", len, received_payload);
-                        }
-                    }
-                    info!("LoRa packet status: {:?}", status.rssi);
-                }
+            let mut lora_ref  = lora.lock().await;
+            match lora_ref.receive_message(&mut recv_buffer).await {
+                Ok(_e) => info!("LoRa message received successfully"),
                 Err(e) => error!("Failed to receive LoRa message: {:?}", e),
             }
 
@@ -145,8 +116,11 @@ async fn main(_spawner: Spawner) {
         }
     };
 
+    let lora_controller = LoraController::new(lora);
+
+
     let channel = LORA_CHANNEL.init(Channel::new());
-    let lora = LORA.init(AsyncMutex::new(lora));
+    let lora_controller_mutex = LORA_CONTROLLER.init(AsyncMutex::new(lora_controller));
 
     info!("Both display and LoRa initialized successfully!");
 
@@ -154,8 +128,8 @@ async fn main(_spawner: Spawner) {
         error!("Failed to show initial message: {:?}", e);
     }
     
-    let _ = _spawner.spawn(task_send(channel, lora));
-    let _ = _spawner.spawn(task_receive(lora));
+    let _ = _spawner.spawn(task_send(channel, lora_controller_mutex));
+    let _ = _spawner.spawn(task_receive(lora_controller_mutex));
     
     // Main loop
     let mut counter = 0u32;
@@ -192,14 +166,11 @@ async fn main(_spawner: Spawner) {
         let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
         let sender = channel.sender();
 
-        match encode_counter_message(tx_seq, counter, timestamp_ms) {
-            Some(msg) => {
-                sender.send(msg).await;
-                info!("Sent CBOR counter message to LoRa task");
-                tx_seq = tx_seq.wrapping_add(1);
-            }
-            None => error!("Failed to encode counter CBOR message"),
-        }
+        let payload = [counter as u8; PAYLOAD_LENGTH]; // Example payload with counter value
+        let mut lora_ref = lora_controller_mutex.lock().await;
+
+        let _ = lora_ref.send_message(MessageType::Counter, tx_seq, timestamp_ms, 0 /*elapsed_ms*/, &payload).await;
+        
 
         info!("Counter: {}", counter);
         counter += 1;
