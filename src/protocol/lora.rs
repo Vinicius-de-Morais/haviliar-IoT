@@ -1,6 +1,3 @@
-use core::fmt::Write;
-
-use heapless::String;
 use minicbor::bytes::ByteSlice;
 use minicbor::encode::write::Cursor;
 use minicbor::{Decode, Encode};
@@ -9,6 +6,16 @@ use crate::hal::lora::PAYLOAD_LENGTH;
 use crate::protocol::message_type::MessageType;
 
 pub const PROTOCOL_VERSION: u8 = 1;
+/// Tamanho máximo de payload de aplicação que garante que o envelope CBOR
+/// completo caiba dentro de um frame LoRa de PAYLOAD_LENGTH bytes.
+///
+/// Cálculo (pior caso):
+/// - 2 bytes reservados para o prefixo de tamanho do CBOR
+/// - ~24 bytes de overhead do envelope (mapa, chaves e campos escalares)
+/// - restante para os dados do payload
+///
+/// 255 (PAYLOAD_LENGTH) - 2 (prefixo) - 24 (overhead) = 229 bytes úteis.
+pub const MAX_APP_PAYLOAD: usize = 229;
 
 #[derive(Debug, Encode, Decode)]
 pub struct LoraEnvelope<'a> {
@@ -76,6 +83,12 @@ pub struct OutgoingFrame<const N: usize> {
 impl<const N: usize> OutgoingFrame<N> {
     pub fn new(msg: &LoraEnvelope) -> Option<Self> {
         if N < 3 {
+            return None;
+        }
+
+        // Garante que o payload de aplicação não excede o limite calculado
+        // para que o envelope CBOR inteiro caiba no frame.
+        if msg.payload.as_ref().len() > MAX_APP_PAYLOAD {
             return None;
         }
 
