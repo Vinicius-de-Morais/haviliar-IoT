@@ -61,6 +61,8 @@ async fn task_send(
             }
             Err(e) => error!("Failed to send LoRa reply: {:?}", e),
         }
+
+        drop(lora_ref);
     }
 }
 
@@ -76,8 +78,8 @@ async fn task_receive(
     ) {
     let tx_sender = tx_channel.sender();
     let ack_receiver = sent_ack_channel.receiver();
-    let last_response_at: Option<Instant> = None;
-    let last_sent_seq: Option<u16> = None;
+    let mut last_response_at: Option<Instant> = None;
+    let mut last_sent_seq: Option<u16> = None;
     let mut lost_packets: u32 = 0;
     let mut response_samples: u32 = 0;
     let mut total_response_ms: u64 = 0;
@@ -110,44 +112,54 @@ async fn task_receive(
             Ok(Ok((envelope, status))) => {
                 let receive_wait_ms = (Instant::now() - receive_started_at).as_millis();
 
-                    let now = Instant::now();
-                    let had_prev = last_response_at.is_some();
-                    let elapsed_ms = if let Some(last) = last_response_at {
-                        (now - last).as_millis()
-                    } else {
-                        0
-                    };
-                    let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
+                let now = Instant::now();
+                let had_prev = last_response_at.is_some();
+                let elapsed_ms = if let Some(last) = last_response_at {
+                    (now - last).as_millis()
+                } else {
+                    0
+                };
+                let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
 
-                    if had_prev {
-                        total_response_ms = total_response_ms.saturating_add(elapsed_ms);
-                        response_samples = response_samples.saturating_add(1);
-                    }
+                if had_prev {
+                    total_response_ms = total_response_ms.saturating_add(elapsed_ms);
+                    response_samples = response_samples.saturating_add(1);
+                }
 
-                    let mut rssi_guard = current_rssi.lock().await;
-                    *rssi_guard = status.rssi as u16;
+                let mut rssi_guard = current_rssi.lock().await;
+                *rssi_guard = status.rssi as u16;
 
-                    let mut elapsed_time_guard = elapsed_time.lock().await;
-                    *elapsed_time_guard = elapsed_ms as u32;
+                let now = Instant::now();
+                let elapsed_ms = if let Some(last) = last_response_at {
+                    (now - last).as_millis()
+                } else {
+                    0
+                };
+                let mut elapsed_time_guard = elapsed_time.lock().await;
+                *elapsed_time_guard = elapsed_ms as u32;
 
-                    let lora_envelope = LoraEnvelope::new(
-                        MessageType::Reply, 
-                        0, 
-                        timestamp_ms, 
-                        elapsed_ms as u32, 
-                        "".as_bytes().into()
-                    );
+                let lora_envelope = LoraEnvelope::new(
+                    MessageType::Reply, 
+                    0, 
+                    timestamp_ms, 
+                    elapsed_ms as u32, 
+                    "".as_bytes().into()
+                );
 
-                    tx_sender.send(lora_envelope).await;
+                tx_sender.send(lora_envelope).await;
 
-                    ack_receiver.receive().await;
+                ack_receiver.receive().await;
+
+                last_response_at = Some(Instant::now());
+                last_sent_seq = Some(envelope.seq);
             }
             Ok(Err(e)) => {
                 error!("Failed to receive LoRa message: {:?}", e);
                 Timer::after_millis(100).await;
             }
-            Err(_) => {
+            Err(_) => {                
                 if let (Some(last_at), Some(seq)) = (last_response_at, last_sent_seq) {
+
                     let now = Instant::now();
                     let elapsed_ms = (now - last_at).as_millis();
                     let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
@@ -158,7 +170,7 @@ async fn task_receive(
 
                    let lora_envelope = LoraEnvelope::new(
                         MessageType::Reply, 
-                        0, 
+                        seq, 
                         timestamp_ms, 
                         elapsed_ms as u32, 
                         "".as_bytes().into()
