@@ -79,7 +79,7 @@ impl<'d> Lora<'d>
         let config = sx126x::Config {
         chip: Sx1262,
         tcxo_ctrl: Some(TcxoCtrlVoltage::Ctrl1V7),
-        use_dcdc: false,
+        use_dcdc: true,
         rx_boost: true,
     };
 
