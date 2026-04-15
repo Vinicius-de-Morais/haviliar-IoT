@@ -16,17 +16,14 @@ use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
 use esp_println::logger::init_logger;
 use haviliar_iot::{
-    factory::lora_factory::LoraFactory,
-    controller::mqtt::MqttController,
-    hal::{
+    controller::{lora::LoraController, mqtt::MqttController}, factory::lora_factory::LoraFactory, hal::{
         lora::{
             Lora, OutgoingMessage,
             PAYLOAD_LENGTH,
         },
         peripheral_manager::PeripheralManagerStatic,
         wifi::Wifi,
-    },
-    protocol::{lora::LoraEnvelope, message_type::MessageType},
+    }, protocol::{lora::LoraEnvelope, message_type::MessageType}
 };
 use log::*;
 use esp_wifi::wifi::{ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState};
@@ -58,35 +55,9 @@ const GATEWAY_CONFIG: GatewayConfig = GatewayConfig {
     forward_ack_timeout_ms: 5_000,
 };
 
-struct ForwardRequest {
-    request_id: u16,
-    expected_ack_seq: u16,
-    frame: OutgoingMessage,
-    ack_timeout_ms: u64,
-}
 
-#[derive(Clone, Copy, Debug)]
-enum ForwardResultKind {
-    AckReceived,
-    AckTimeout,
-    SendError,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct ForwardResult {
-    request_id: u16,
-    seq: u16,
-    kind: ForwardResultKind,
-    elapsed_ms: u32,
-}
-
-struct PendingForward {
-    request: ForwardRequest,
-    sent_at: Instant,
-}
-
-type ForwardToLoraChannel = Channel<CriticalSectionRawMutex, ForwardRequest, 8>;
-type LoraToMqttChannel = Channel<CriticalSectionRawMutex, ForwardResult, 8>;
+type ForwardToLoraChannel = Channel<CriticalSectionRawMutex, LoraEnvelope<'static>, 8>;
+type LoraToMqttChannel = Channel<CriticalSectionRawMutex, LoraEnvelope<'static>, 8>;
 
 static FORWARD_TO_LORA_CHANNEL: StaticCell<ForwardToLoraChannel> = StaticCell::new();
 static LORA_TO_MQTT_CHANNEL: StaticCell<LoraToMqttChannel> = StaticCell::new();
@@ -95,19 +66,6 @@ static TX_BUFFER_CELL: StaticCell<[u8; 4096]> = StaticCell::new();
 static SOCKET_CELL: StaticCell<TcpSocket<'static>> = StaticCell::new();
 static MQTT_CLIENT_CELL: StaticCell<Mutex<CriticalSectionRawMutex, MqttController<'static>>> =
     StaticCell::new();
-
-fn encode_forward_frame(seq: u16, timestamp_ms: u32, payload: &[u8]) -> Option<OutgoingMessage> {
-    let envelope = LoraEnvelope::new(MessageType::Reply, seq, timestamp_ms, 0, payload.into());
-    OutgoingMessage::new(&envelope)
-}
-
-fn result_kind_to_str(kind: ForwardResultKind) -> &'static str {
-    match kind {
-        ForwardResultKind::AckReceived => "ack_received",
-        ForwardResultKind::AckTimeout => "ack_timeout",
-        ForwardResultKind::SendError => "send_error",
-    }
-}
 
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>, ssid: &'static str, password: &'static str) {
@@ -146,26 +104,24 @@ async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
 
 #[embassy_executor::task]
 async fn task_lora_gateway(
-    mut lora: Lora<'static>,
+    mut lora: LoraController,
     forward_channel: &'static ForwardToLoraChannel,
     result_channel: &'static LoraToMqttChannel,
 ) {
     let forward_rx = forward_channel.receiver();
     let result_tx = result_channel.sender();
-    let mut pending_forward: Option<PendingForward> = None;
+    let mut pending_forward: Option<LoraEnvelope<'static>> = None;
 
     loop {
         let mut recv_buffer = [0u8; PAYLOAD_LENGTH];
         let rx_result = lora
-            .receive(&mut recv_buffer)
+            .receive_message(&mut recv_buffer)
             .with_timeout(Duration::from_millis(LORA_RX_POLL_MS))
             .await;
 
         match rx_result {
-            Ok(Ok((len, _status))) => {
-                let len_usize = len as usize;
-                if len_usize > 0 {
-                    let received_payload = &recv_buffer[..len_usize];
+            Ok(Ok((envelope, _status))) => {
+                    
 
                     // if let Some(decoded) = decode_protocol_message(received_payload) {
                     //     match decode_protocol_payload_utf8(&decoded) {
@@ -204,7 +160,7 @@ async fn task_lora_gateway(
                     //         }
                     //     }
                     // }
-                }
+                //}
             }
             Ok(Err(e)) => {
                 error!("Erro de radio ao receber LoRa: {:?}", e);
@@ -236,7 +192,7 @@ async fn task_lora_gateway(
         if pending_forward.is_none() {
             if let Ok(request) = forward_rx.try_receive() {
                 let payload = &request.frame.payload[..request.frame.len];
-                match lora.send(payload).await {
+                match lora.send_message_envelope(payload).await {
                     Ok(()) => {
                         info!(
                             "Forward enviado para LoRa: request_id={}, seq={}",
@@ -273,7 +229,7 @@ async fn task_lora_gateway(
 #[embassy_executor::task]
 async fn task_mqtt_ingress(
     mqtt_controller_mutex: &'static Mutex<CriticalSectionRawMutex, MqttController<'static>>,
-    sender: Sender<'static, CriticalSectionRawMutex, ForwardRequest, 8>,
+    sender: Sender<'static, CriticalSectionRawMutex, LoraEnvelope<'static>, 8>,
 ) {
     let mut request_id: u16 = 0;
     let mut seq: u16 = 1;
@@ -293,29 +249,20 @@ async fn task_mqtt_ingress(
 
                 let now = Instant::now();
                 let timestamp_ms = now.as_millis().min(u32::MAX as u64) as u32;
-                if let Some(frame) = encode_forward_frame(seq, timestamp_ms, payload_copy.as_slice()) {
-                    let request = ForwardRequest {
-                        request_id,
-                        expected_ack_seq: seq,
-                        frame,
-                        ack_timeout_ms: GATEWAY_CONFIG.forward_ack_timeout_ms,
-                    };
+                drop(mqtt_controller);
 
-                    drop(mqtt_controller);
-                    sender.send(request).await;
+                let envelope = LoraEnvelope::new(MessageType::Reply, seq, timestamp_ms, 0, payload_copy.as_slice().into());
+                sender.send(envelope).await;
 
-                    info!(
-                        "MQTT->LoRa enfileirado: request_id={}, seq={}, bytes={}",
-                        request_id,
-                        seq,
-                        payload_copy.len()
-                    );
+                info!(
+                    "MQTT->LoRa enfileirado: request_id={}, seq={}, bytes={}",
+                    request_id,
+                    seq,
+                    payload_copy.len()
+                );
+                request_id = request_id.wrapping_add(1);
+                seq = seq.wrapping_add(1);
 
-                    request_id = request_id.wrapping_add(1);
-                    seq = seq.wrapping_add(1);
-                } else {
-                    error!("Falha ao codificar payload MQTT para forward LoRa");
-                }
             }
             Err(e) => {
                 error!("Erro ao receber mensagem MQTT: {:?}", e);
@@ -330,7 +277,7 @@ async fn task_mqtt_ingress(
 #[embassy_executor::task]
 async fn task_mqtt_egress(
     mqtt_controller_mutex: &'static Mutex<CriticalSectionRawMutex, MqttController<'static>>,
-    receiver: Receiver<'static, CriticalSectionRawMutex, ForwardResult, 8>,
+    receiver: Receiver<'static, CriticalSectionRawMutex, LoraEnvelope<'static>, 8>,
 ) {
     let mut payload = heapless::String::<128>::new();
 
@@ -442,11 +389,12 @@ async fn main(spawner: Spawner) {
             panic!("LoRa initialization failed");
         }
     };
+    let lora_controller = LoraController::new(lora);
 
     let forward_channel = FORWARD_TO_LORA_CHANNEL.init(Channel::new());
     let result_channel = LORA_TO_MQTT_CHANNEL.init(Channel::new());
 
-    let _ = spawner.spawn(task_lora_gateway(lora, forward_channel, result_channel));
+    let _ = spawner.spawn(task_lora_gateway(lora_controller, forward_channel, result_channel));
     let _ = spawner.spawn(task_mqtt_ingress(mqtt_controller_mutex, forward_channel.sender()));
     let _ = spawner.spawn(task_mqtt_egress(mqtt_controller_mutex, result_channel.receiver()));
 
