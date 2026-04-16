@@ -1,4 +1,4 @@
-use minicbor::bytes::ByteSlice;
+use minicbor::bytes::{ByteSlice, ByteVec};
 use minicbor::encode::write::Cursor;
 use minicbor::{Decode, Encode};
 
@@ -18,7 +18,7 @@ pub const PROTOCOL_VERSION: u8 = 1;
 pub const MAX_APP_PAYLOAD: usize = 229;
 
 #[derive(Debug, Encode, Decode)]
-pub struct LoraEnvelope<'a> {
+pub struct LoraEnvelope {
     #[n(0)]
     pub version: u8,
     #[n(1)]
@@ -30,17 +30,17 @@ pub struct LoraEnvelope<'a> {
     #[n(4)]
     pub elapsed_ms: u32,
     #[n(5)]
-    pub payload: &'a ByteSlice,
+    pub payload: ByteVec,
 }
 
-impl<'a> LoraEnvelope<'a> {
+impl LoraEnvelope {
     
     pub fn new(
         msg_type: MessageType,
         seq: u16,
         timestamp_ms: u32,
         elapsed_ms: u32,
-        payload: &'a ByteSlice,
+        payload:  impl Into<ByteVec>,
     ) -> Self {
         LoraEnvelope {
             version: PROTOCOL_VERSION,
@@ -48,7 +48,7 @@ impl<'a> LoraEnvelope<'a> {
             timestamp_ms,
             elapsed_ms,
             seq,
-            payload,
+            payload: payload.into(),
         }
     }
 
@@ -58,7 +58,7 @@ impl<'a> LoraEnvelope<'a> {
         seq: u16,
         timestamp_ms: u32,
         elapsed_ms: u32,
-        payload: &'a ByteSlice,
+        payload: impl Into<ByteVec>,
     ) -> Self {
         LoraEnvelope {
             version,
@@ -66,7 +66,7 @@ impl<'a> LoraEnvelope<'a> {
             timestamp_ms,
             elapsed_ms,
             seq,
-            payload,
+            payload: payload.into(),
         }
     }
 
@@ -88,7 +88,7 @@ impl<const N: usize> OutgoingFrame<N> {
 
         // Garante que o payload de aplicação não excede o limite calculado
         // para que o envelope CBOR inteiro caiba no frame.
-        if msg.payload.as_ref().len() > MAX_APP_PAYLOAD {
+        if msg.payload.len() > MAX_APP_PAYLOAD {
             return None;
         }
 
@@ -119,23 +119,21 @@ impl<const N: usize> OutgoingFrame<N> {
 pub struct LoraParser;
 
 impl LoraParser {
-    pub fn decode_envelope<'a>(received: &'a [u8]) -> Option<LoraEnvelope<'a>> {
+    pub fn decode_envelope(received: &[u8]) -> Option<LoraEnvelope> {
         if received.len() < 2 {
             return None;
         }
-
         let declared_len = u16::from_le_bytes([received[0], received[1]]) as usize;
         if declared_len == 0 || declared_len + 2 > received.len() {
             return None;
         }
-
         let cbor_payload: &[u8] = &received[2..(2 + declared_len)];
         minicbor::decode::<LoraEnvelope>(cbor_payload).ok()
     }
 
-    pub fn decode_payload_utf8<'a>(
-        message: &'a LoraEnvelope<'a>,
-    ) -> core::result::Result<&'a str, &'a [u8]> {
+    pub fn decode_payload_utf8(
+        message: &LoraEnvelope,
+    ) -> core::result::Result<&str, &[u8]> {
         let payload = message.payload.as_ref();
         core::str::from_utf8(payload).map_err(|_| payload)
     }
@@ -145,16 +143,15 @@ impl LoraParser {
         seq: u16,
         timestamp_ms: u32,
         elapsed_ms: u32,
-        payload: &[u8],
+        payload: impl Into<ByteVec>,
     ) -> Option<OutgoingFrame<N>> {
         let envelope = LoraEnvelope::new(
-            msg_type, 
-            seq, 
+            msg_type,
+            seq,
             timestamp_ms,
             elapsed_ms,
-            payload.into()
+            payload.into(),
         );
-
         OutgoingFrame::new(&envelope)
     }
 }

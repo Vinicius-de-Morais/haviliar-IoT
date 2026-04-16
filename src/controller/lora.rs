@@ -21,7 +21,7 @@ impl LoraController {
         elapsed_ms: u32,
         payload: &[u8]
     ) -> Result<(), RadioError> {
-        let frame = LoraParser::encode_envelope::<PAYLOAD_LENGTH>(msg_type, sequence, timestamp_ms, elapsed_ms, payload);
+        let frame = LoraParser::encode_envelope::<PAYLOAD_LENGTH>(msg_type, sequence, timestamp_ms, elapsed_ms, payload.to_vec());
 
         match frame {
             Some(mut outgoing) => {
@@ -35,7 +35,7 @@ impl LoraController {
         }
     }
 
-    pub async fn send_message_envelope(&mut self, envelope: &LoraEnvelope<'_>) -> Result<(), RadioError> {
+    pub async fn send_message_envelope(&mut self, envelope: &LoraEnvelope) -> Result<(), RadioError> {
         let frame = envelope.into_outgoing();
 
         match frame {
@@ -53,7 +53,7 @@ impl LoraController {
     pub async fn receive_message<'a>(
         &mut self, 
         recv_buffer: &'a mut [u8]
-    ) -> Result<(LoraEnvelope<'a>, PacketStatus), RadioError> {
+    ) -> Result<(LoraEnvelope, PacketStatus), RadioError> {
 
         match self.lora.receive(recv_buffer).await {
             Ok((len, status)) => {
@@ -84,7 +84,7 @@ impl LoraController {
                                     decoded.seq,
                                     decoded.timestamp_ms,
                                     decoded.elapsed_ms,
-                                    decoded.payload.as_ref()
+                                    decoded.payload
                                 );
 
                                 return Ok((decoded,status));

@@ -13,4 +13,10 @@ pub enum MessageType {
 
     #[n(3)]
     Reply = 3,
+
+    #[n(4)]
+    Ack = 4,
+
+    #[n(5)]
+    Open = 5,
 }

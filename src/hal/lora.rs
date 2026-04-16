@@ -23,7 +23,7 @@ use crate::protocol::lora as lora_protocol;
 const LORA_FREQUENCY_IN_HZ: u32 = 903_900_000;
 pub const PAYLOAD_LENGTH: usize = 255;
 pub type OutgoingMessage = lora_protocol::OutgoingFrame<PAYLOAD_LENGTH>;
-pub type DecodedProtocolMessage<'a> = lora_protocol::LoraEnvelope<'a>;
+pub type DecodedProtocolMessage<'a> = lora_protocol::LoraEnvelope;
 
 type LoRaInterface<'d> = GenericSx127xInterfaceVariant<
     Output<'d>,

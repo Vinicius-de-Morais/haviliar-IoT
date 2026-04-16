@@ -18,7 +18,6 @@ use esp_println::logger::init_logger;
 use haviliar_iot::{
     controller::{lora::LoraController, mqtt::MqttController}, factory::lora_factory::LoraFactory, hal::{
         lora::{
-            Lora, OutgoingMessage,
             PAYLOAD_LENGTH,
         },
         peripheral_manager::PeripheralManagerStatic,
@@ -56,8 +55,8 @@ const GATEWAY_CONFIG: GatewayConfig = GatewayConfig {
 };
 
 
-type ForwardToLoraChannel = Channel<CriticalSectionRawMutex, LoraEnvelope<'static>, 8>;
-type LoraToMqttChannel = Channel<CriticalSectionRawMutex, LoraEnvelope<'static>, 8>;
+type ForwardToLoraChannel = Channel<CriticalSectionRawMutex, LoraEnvelope, 8>;
+type LoraToMqttChannel = Channel<CriticalSectionRawMutex, LoraEnvelope, 8>;
 
 static FORWARD_TO_LORA_CHANNEL: StaticCell<ForwardToLoraChannel> = StaticCell::new();
 static LORA_TO_MQTT_CHANNEL: StaticCell<LoraToMqttChannel> = StaticCell::new();
@@ -110,7 +109,7 @@ async fn task_lora_gateway(
 ) {
     let forward_rx = forward_channel.receiver();
     let result_tx = result_channel.sender();
-    let mut pending_forward: Option<LoraEnvelope<'static>> = None;
+    let mut pending_forward: Option<LoraEnvelope> = None;
 
     loop {
         let mut recv_buffer = [0u8; PAYLOAD_LENGTH];
@@ -121,46 +120,16 @@ async fn task_lora_gateway(
 
         match rx_result {
             Ok(Ok((envelope, _status))) => {
+                // aq significa que recebemos uma mensagem LoRa
+                // oq significa que teremos que abrir o servomotor e enviar um ACK via lora.
+                // pq se a mensagem foi recebida via lora, significa que o dispositivo final nao tem conectividade com o broker MQTT, 
+                // entao o ACK tem que ser enviado via LoRa mesmo.
+
+                // Mas eu preciso ainda verificar se a mensagem recebida é um ACK de um forward que eu enviei, ou se é uma nova mensagem vinda de um dispositivo final.
+                // Se for um ACK, eu preciso atualizar o pending_forward e enviar o resultado para MQTT
+                // Se for uma nova mensagem, eu preciso enviar um ACK de volta para o dispositivo final preencher alguma variavel de "pending ACK".
+                // quando o pending_ack for igual sequence da mensagem recebida, eu sei que o dispositivo final recebeu o ACK e pode processar a mensagem normalmente, e entao eu posso enviar o resultado para MQTT.
                     
-
-                    // if let Some(decoded) = decode_protocol_message(received_payload) {
-                    //     match decode_protocol_payload_utf8(&decoded) {
-                    //         Ok(text) => {
-                    //             info!(
-                    //                 "LoRa RX: seq={}, ts={}, payload='{}'",
-                    //                 decoded.seq, decoded.timestamp_ms, text
-                    //             );
-                    //         }
-                    //         Err(_) => {
-                    //             info!(
-                    //                 "LoRa RX: seq={}, ts={}, payload(bin)",
-                    //                 decoded.seq, decoded.timestamp_ms
-                    //             );
-                    //         }
-                    //     }
-
-                    //     if let Some(ref pending) = pending_forward {
-                    //         if decoded.seq == pending.request.expected_ack_seq {
-                    //             let elapsed_ms =
-                    //                 (Instant::now() - pending.sent_at).as_millis().min(u32::MAX as u64)
-                    //                     as u32;
-
-                    //             let result = ForwardResult {
-                    //                 request_id: pending.request.request_id,
-                    //                 seq: pending.request.expected_ack_seq,
-                    //                 kind: ForwardResultKind::AckReceived,
-                    //                 elapsed_ms,
-                    //             };
-
-                    //             if result_tx.try_send(result).is_err() {
-                    //                 error!("Fila LORA->MQTT cheia: nao foi possivel publicar AckReceived");
-                    //             }
-
-                    //             pending_forward = None;
-                    //         }
-                    //     }
-                    // }
-                //}
             }
             Ok(Err(e)) => {
                 error!("Erro de radio ao receber LoRa: {:?}", e);
@@ -171,54 +140,21 @@ async fn task_lora_gateway(
             }
         }
 
-        if let Some(ref pending) = pending_forward {
-            let elapsed_ms_u64 = (Instant::now() - pending.sent_at).as_millis();
-            if elapsed_ms_u64 >= pending.request.ack_timeout_ms {
-                let result = ForwardResult {
-                    request_id: pending.request.request_id,
-                    seq: pending.request.expected_ack_seq,
-                    kind: ForwardResultKind::AckTimeout,
-                    elapsed_ms: elapsed_ms_u64.min(u32::MAX as u64) as u32,
-                };
-
-                if result_tx.try_send(result).is_err() {
-                    error!("Fila LORA->MQTT cheia: nao foi possivel publicar AckTimeout");
-                }
-
-                pending_forward = None;
-            }
-        }
-
+        // por enquanto vou so receber novos requests enquanto nao tiver um forward pendente, pq o protocolo atual é "enviar um forward e esperar o ACK antes de enviar outro".
         if pending_forward.is_none() {
             if let Ok(request) = forward_rx.try_receive() {
-                let payload = &request.frame.payload[..request.frame.len];
-                match lora.send_message_envelope(payload).await {
+                // aq significa que recebemos um novo request do MQTT para enviar via LoRa
+                // entao eu preciso enviar esse request via LoRa e marcar ele como pending_forward, para esperar o ACK.
+                // se o envio falhar, eu preciso enviar o resultado de falha para MQTT imediatamente, sem esperar o ACK.
+
+                match lora.send_message_envelope(&request).await {
                     Ok(()) => {
-                        info!(
-                            "Forward enviado para LoRa: request_id={}, seq={}",
-                            request.request_id, request.expected_ack_seq
-                        );
-                        pending_forward = Some(PendingForward {
-                            request,
-                            sent_at: Instant::now(),
-                        });
+                        pending_forward = Some(request);
                     }
                     Err(e) => {
-                        error!(
-                            "Falha no forward para LoRa: request_id={}, erro={:?}",
-                            request.request_id, e
-                        );
-
-                        let result = ForwardResult {
-                            request_id: request.request_id,
-                            seq: request.expected_ack_seq,
-                            kind: ForwardResultKind::SendError,
-                            elapsed_ms: 0,
-                        };
-
-                        if result_tx.try_send(result).is_err() {
-                            error!("Fila LORA->MQTT cheia: nao foi possivel publicar SendError");
-                        }
+                        error!("Falha ao enviar mensagem LoRa: {:?}", e);
+                        let result = LoraEnvelope::new(MessageType::Reply, request.seq, request.timestamp_ms, 0, b"LoRa send failed".as_slice().to_vec());
+                        result_tx.send(result).await;
                     }
                 }
             }
@@ -229,7 +165,7 @@ async fn task_lora_gateway(
 #[embassy_executor::task]
 async fn task_mqtt_ingress(
     mqtt_controller_mutex: &'static Mutex<CriticalSectionRawMutex, MqttController<'static>>,
-    sender: Sender<'static, CriticalSectionRawMutex, LoraEnvelope<'static>, 8>,
+    sender: Sender<'static, CriticalSectionRawMutex, LoraEnvelope, 8>,
 ) {
     let mut request_id: u16 = 0;
     let mut seq: u16 = 1;
@@ -249,20 +185,21 @@ async fn task_mqtt_ingress(
 
                 let now = Instant::now();
                 let timestamp_ms = now.as_millis().min(u32::MAX as u64) as u32;
-                drop(mqtt_controller);
-
-                let envelope = LoraEnvelope::new(MessageType::Reply, seq, timestamp_ms, 0, payload_copy.as_slice().into());
+                
+                let envelope = LoraEnvelope::new(MessageType::Open, seq, timestamp_ms, 0, payload_copy.clone().to_vec());
                 sender.send(envelope).await;
-
+                
                 info!(
                     "MQTT->LoRa enfileirado: request_id={}, seq={}, bytes={}",
                     request_id,
                     seq,
                     payload_copy.len()
                 );
+                
                 request_id = request_id.wrapping_add(1);
                 seq = seq.wrapping_add(1);
-
+                
+                drop(mqtt_controller);
             }
             Err(e) => {
                 error!("Erro ao receber mensagem MQTT: {:?}", e);
@@ -277,21 +214,16 @@ async fn task_mqtt_ingress(
 #[embassy_executor::task]
 async fn task_mqtt_egress(
     mqtt_controller_mutex: &'static Mutex<CriticalSectionRawMutex, MqttController<'static>>,
-    receiver: Receiver<'static, CriticalSectionRawMutex, LoraEnvelope<'static>, 8>,
+    receiver: Receiver<'static, CriticalSectionRawMutex, LoraEnvelope, 8>,
 ) {
     let mut payload = heapless::String::<128>::new();
 
     loop {
         let result = receiver.receive().await;
         payload.clear();
-        let _ = write!(
-            &mut payload,
-            "request_id={},seq={},status={},elapsed_ms={}",
-            result.request_id,
-            result.seq,
-            result_kind_to_str(result.kind),
-            result.elapsed_ms
-        );
+
+        // aq significa que foi recebido um ack do foward que foi recebido anteriormente via MQTT, ou seja, 
+        // o dispositivo final recebeu a solicitação e agora vamos notificar o mqtt disso
 
         let mut mqtt_controller = mqtt_controller_mutex.lock().await;
         match mqtt_controller
@@ -302,10 +234,7 @@ async fn task_mqtt_egress(
             Err(e) => error!("Falha ao publicar status no MQTT: {:?}", e),
         }
 
-        info!(
-            "LoRa->MQTT resultado: request_id={}, seq={}, status={:?}, elapsed={} ms",
-            result.request_id, result.seq, result.kind, result.elapsed_ms
-        );
+        
     }
 }
 
