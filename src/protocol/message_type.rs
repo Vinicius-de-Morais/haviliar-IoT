@@ -1,6 +1,6 @@
 use minicbor::{Decode, Encode};
 
-#[derive(Debug, Encode, Decode)]
+#[derive(Debug, Encode, Decode, Clone, Copy)]
 pub enum MessageType {
     #[n(0)]
     Counter = 0,
