@@ -1,6 +1,6 @@
 use minicbor::{Decode, Encode};
 
-#[derive(Debug, Encode, Decode)]
+#[derive(Debug, Encode, Decode, Clone, Copy)]
 pub enum MessageType {
     #[n(0)]
     Counter = 0,
@@ -13,4 +13,10 @@ pub enum MessageType {
 
     #[n(3)]
     Reply = 3,
+
+    #[n(4)]
+    Ack = 4,
+
+    #[n(5)]
+    Open = 5,
 }

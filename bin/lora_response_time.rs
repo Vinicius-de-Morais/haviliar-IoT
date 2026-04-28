@@ -31,7 +31,7 @@ static LORA: StaticCell<AsyncMutex<CriticalSectionRawMutex, LoraController>> = S
 static RNG: StaticCell<AsyncMutex<CriticalSectionRawMutex, Rng>> = StaticCell::new();
 //static DISPLAY: StaticCell<AsyncMutex<CriticalSectionRawMutex, Display<'static>>> = StaticCell::new();
 
-type LoRaChannel = Channel<CriticalSectionRawMutex, LoraEnvelope<'static>, 1>;
+type LoRaChannel = Channel<CriticalSectionRawMutex, LoraEnvelope, 1>;
 type SentAckChannel = Channel<CriticalSectionRawMutex, (), 1>;
 static LORA_CHANNEL: StaticCell<LoRaChannel> = StaticCell::new();
 static SENT_ACK_CHANNEL: StaticCell<SentAckChannel> = StaticCell::new();
@@ -146,7 +146,7 @@ async fn task_receive(
                     0, 
                     timestamp_ms, 
                     elapsed_ms as u32, 
-                    "".as_bytes().into()
+                    "".as_bytes().to_vec()
                 );
 
                 tx_sender.send(lora_envelope).await;
@@ -176,7 +176,7 @@ async fn task_receive(
                         seq, 
                         timestamp_ms, 
                         elapsed_ms as u32, 
-                        "".as_bytes().into()
+                    "".as_bytes().to_vec()
                     );
 
                     tx_sender.send(lora_envelope).await;
