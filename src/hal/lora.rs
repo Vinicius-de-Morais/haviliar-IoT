@@ -22,7 +22,7 @@ pub const PAYLOAD_LENGTH: usize = 255;
 pub type OutgoingMessage = lora_protocol::OutgoingFrame<PAYLOAD_LENGTH>;
 pub type DecodedProtocolMessage<'a> = lora_protocol::LoraEnvelope;
 
-type LoRaInterface<'d> = GenericSx127xInterfaceVariant<
+type LoRaInterface<'d> = GenericSx126xInterfaceVariant<
     Output<'d>,
     Input<'d>,
 >;

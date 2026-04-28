@@ -84,13 +84,13 @@ async fn task_receive(
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     // Initialize heap first before any logging
-    unsafe {
-        esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
-            HEAP.as_mut_ptr() as *mut u8,
-            HEAP_SIZE,
-            esp_alloc::MemoryCapability::Internal.into(),
-        ));
-    }
+    // unsafe {
+    //     esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+    //         HEAP.as_mut_ptr() as *mut u8,
+    //         HEAP_SIZE,
+    //         esp_alloc::MemoryCapability::Internal.into(),
+    //     ));
+    // }
     
     init_logger(log::LevelFilter::Info);
     
