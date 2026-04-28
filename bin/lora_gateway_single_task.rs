@@ -22,6 +22,7 @@ use haviliar_iot::{
 };
 use log::*;
 use esp_wifi::wifi::{ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState};
+use minicbor::decode::info;
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -30,7 +31,7 @@ const HEAP_SIZE: usize = 64 * 1024;
 static mut HEAP: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
 
 // Poll curto para permitir alternar entre RX LoRa e fila de requests vindos do MQTT.
-const LORA_RX_POLL_MS: u64 = 250;
+const LORA_RX_POLL_MS: u64 = 5000;
 
 struct GatewayConfig {
     broker_ip: embassy_net::Ipv4Address,
@@ -42,7 +43,7 @@ struct GatewayConfig {
 }
 
 const GATEWAY_CONFIG: GatewayConfig = GatewayConfig {
-    broker_ip: embassy_net::Ipv4Address::new(192, 168, 1, 21),
+    broker_ip: embassy_net::Ipv4Address::new(10, 43, 53, 199),
     broker_port: 1883,
     main_topic: "esp32-haviliar",
     client_id: "esp32-lora-gateway-dev",
@@ -170,6 +171,9 @@ async fn task_lora_gateway(
         match pending_forward {
             Some(ref pending) => {
                 let payload_copy = pending.payload.clone();
+                
+                info!("Reenviando mensagem pendente para LoRa: seq={}, bytes={}", pending.seq, payload_copy.len());
+
                 lora.send_message(pending.msg_type, pending.seq, pending.timestamp_ms, pending.elapsed_ms, payload_copy.as_slice()).await.ok();
             } 
             None =>  {
@@ -177,6 +181,7 @@ async fn task_lora_gateway(
 
                     match lora.send_message_envelope(&request).await {
                         Ok(()) => {
+                            info!("LoRa forward enviado: seq={}, bytes={}", request.seq, request.payload.len());
                             pending_forward = Some(request);
                         }
                         Err(e) => {
