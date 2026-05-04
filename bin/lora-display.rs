@@ -9,11 +9,11 @@ use embassy_time::{Instant, Timer};
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
 use haviliar_iot::{
-    controller::lora::{self, LoraController},
+    controller::lora::LoraController,
     factory::{display_factory::DisplayFactory, lora_factory::LoraFactory},
     hal::{
         lora::{
-            Lora, OutgoingMessage, PAYLOAD_LENGTH,
+            OutgoingMessage, PAYLOAD_LENGTH,
         },
         peripheral_manager::PeripheralManagerStatic,
     },
@@ -45,6 +45,7 @@ async fn task_send(
         lora.lock().await.send_message(
             haviliar_iot::protocol::message_type::MessageType::Counter,
             1, // Using first byte of payload as sequence for simplicity
+            0, // request_id
             Instant::now().as_millis() as u32,
             0, // Elapsed time can be set to 0 for this example
             payload,
@@ -174,7 +175,7 @@ async fn main(_spawner: Spawner) {
         let payload = [counter as u8; MAX_APP_PAYLOAD];
         let mut lora_ref = lora_controller_mutex.lock().await;
 
-        let _ = lora_ref.send_message(MessageType::Counter, tx_seq, timestamp_ms, 0 /*elapsed_ms*/, &payload).await;
+        let _ = lora_ref.send_message(MessageType::Counter, tx_seq, 0, timestamp_ms, 0 /*elapsed_ms*/, &payload).await;
         
 
         info!("Counter: {}", counter);

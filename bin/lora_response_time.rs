@@ -143,6 +143,7 @@ async fn task_receive(
                 let lora_envelope = LoraEnvelope::new(
                     MessageType::Reply, 
                     0, 
+                    0,
                     timestamp_ms, 
                     elapsed_ms as u32, 
                     "".as_bytes().to_vec()
@@ -173,6 +174,7 @@ async fn task_receive(
                    let lora_envelope = LoraEnvelope::new(
                         MessageType::Reply, 
                         seq, 
+                        0,
                         timestamp_ms, 
                         elapsed_ms as u32, 
                     "".as_bytes().to_vec()
