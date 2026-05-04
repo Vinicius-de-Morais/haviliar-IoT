@@ -240,7 +240,7 @@ async fn main(_spawner: Spawner) {
     socket.set_timeout(Some(embassy_time::Duration::from_secs(60))); 
     socket.set_keep_alive(Some(embassy_time::Duration::from_secs(30)));
 
-    let socket = SOCKET_CELL.init(socket);
+    //let mut socket = SOCKET_CELL.init(socket);
 
     let address = embassy_net::Ipv4Address::new(192, 168, 1, 21);
     let remote_endpoint = (address, 1883);
@@ -257,7 +257,7 @@ async fn main(_spawner: Spawner) {
         break;
     }
 
-    let mqtt_controller = match MqttController::new(socket, "esp32/open", "esp32-haviliar").await {
+    let mqtt_controller = match MqttController::new(socket, "esp32/open", "esp32-haviliar", "esp32/open").await {
         Ok(controller) => controller,
         Err(e) => {
             error!("Failed to create MQTT controller: {:?}", e);

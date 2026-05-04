@@ -1,7 +1,5 @@
-use core::net::Ipv4Addr;
-
 use alloc::format;
-use embassy_net::tcp::{TcpSocket, client};
+use embassy_net::tcp::TcpSocket;
 use embassy_time::{Duration, WithTimeout};
 use log::{error, info};
 use rust_mqtt::{client::{client::MqttClient, client_config::ClientConfig}, packet::v5::reason_codes::ReasonCode, utils::rng_generator::CountingRng};
@@ -11,18 +9,15 @@ static RECV_BUFFER_CELL: StaticCell<[u8; 256]> = StaticCell::new();
 static WRITE_BUFFER_CELL: StaticCell<[u8; 256]> = StaticCell::new();
 
 pub struct MqttController<'a>{
-    //socket: &'a mut TcpSocket<'a>,
-    //address: Ipv4Addr,
-    client: MqttClient<'a, &'a mut TcpSocket<'a>, 5, CountingRng>,
+    client: MqttClient<'a, TcpSocket<'a>, 5, CountingRng>,
     main_topic: &'static str,
-    is_connected: bool,
 }
 
 // impl MqttController {
 //     pub fn new(socket: TcpSocket<'static>, address: Ipv4Addr, main_topic: &'static str, cliend_id: &'static str) -> Self {
 //         let mut write_buffer = [0u8; 256];
 impl<'a> MqttController<'a> {
-    pub async fn new(socket: &'a mut TcpSocket<'a>, main_topic: &'static str, cliend_id: &'static str) -> Result<Self, ReasonCode> {
+    pub async fn new(socket: TcpSocket<'a>, main_topic: &'static str, client_id: &'static str, subscribe_topic: &'static str) -> Result<Self, ReasonCode> {
         
         let recv_buffer = RECV_BUFFER_CELL.init([0u8; 256]);
         let write_buffer = WRITE_BUFFER_CELL.init([0u8; 256]);
@@ -32,15 +27,14 @@ impl<'a> MqttController<'a> {
             CountingRng(20000),
         );
         config.add_max_subscribe_qos(rust_mqtt::packet::v5::publish_packet::QualityOfService::QoS1);
-        config.add_client_id(cliend_id);
+        config.add_client_id(client_id);
         config.max_packet_size = 255;
-        //config.keep_alive = 10;
 
         let mut client = MqttClient::<_, 5, _>::new(socket, write_buffer, 255, recv_buffer, 255, config);
 
         match client.connect_to_broker().await {
             Ok(()) => {
-                info!("✓ MQTT connected!");
+                info!("MQTT connected!");
             }
             Err(mqtt_error) => {
                 error!("MQTT connect error: {:?}", mqtt_error);
@@ -48,9 +42,9 @@ impl<'a> MqttController<'a> {
             }
         }
     
-        match client.subscribe_to_topic("esp32/open").await {
+        match client.subscribe_to_topic(subscribe_topic).await {
                 Ok(()) => {
-                    info!("✓ Subscribed to topic 'esp32/open' successfully!");
+                    info!("Subscribed to topic '{}'", subscribe_topic);
                 }
                 Err(mqtt_error) => {
                     error!("Subscribe error: {:?}", mqtt_error);
@@ -60,11 +54,8 @@ impl<'a> MqttController<'a> {
 
         Ok(
             MqttController {
-                //socket,
-                //address,
                 client,
                 main_topic,
-                is_connected: true,
             }
         )
     }
