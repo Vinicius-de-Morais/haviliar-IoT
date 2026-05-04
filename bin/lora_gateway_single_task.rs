@@ -19,7 +19,7 @@ use esp_println::logger::init_logger;
 use haviliar_iot::{
     controller::{lora::LoraController, mqtt::MqttController}, factory::lora_factory::LoraFactory, hal::{
         lora::PAYLOAD_LENGTH, peripheral_manager::PeripheralManagerStatic, servo_motor::ServoMotor, wifi::Wifi
-    }, protocol::{lora::LoraEnvelope, message_type::MessageType}
+    },     protocol::{lora::LoraEnvelope, message_type::MessageType}
 };
 use log::*;
 use esp_wifi::wifi::{ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState};
@@ -180,11 +180,6 @@ async fn task_lora_gateway(
                         } else {
                             seen_seqs.insert(envelope.request_id);
                             servo_motor.open().ok();
-
-                            Timer::after(Duration::from_secs(5)).await;
-
-                            servo_motor.close().ok();
-
                             let ack = LoraEnvelope::new(MessageType::Ack, envelope.seq, envelope.request_id, envelope.timestamp_ms, 0, b"ACK".as_slice().to_vec());
                             lora.send_message_envelope(&ack).await.ok();
                             pending_forward = Some(ack);
@@ -238,15 +233,30 @@ async fn task_lora_gateway(
 #[allow(static_mut_refs)]
 async fn task_mqtt_ingress(
     stack: &'static Stack<'static>,
-    sender: Sender<'static, CriticalSectionRawMutex, LoraEnvelope, 8>,
+    sender: &Sender<'a, CriticalSectionRawMutex, LoraEnvelope, 8>,
+    request_id: &mut u32,
+    seq: &mut u16,
+    rx_buf: &'a mut [u8],
+    tx_buf: &'a mut [u8],
 ) {
-    let mut request_id: u32 = 0;
-    let mut seq: u16 = 1;
-    static mut RX_BUF: [u8; 4096] = [0u8; 4096];
-    static mut TX_BUF: [u8; 4096] = [0u8; 4096];
-    static mut MQTT_CLIENT_RX: [u8; 1024] = [0u8; 1024];
-    static mut MQTT_CLIENT_TX: [u8; 1024] = [0u8; 1024];
-    let mut client: Option<MqttController<'static>> = None;
+    let mut socket = TcpSocket::new(*stack, rx_buf, tx_buf);
+    socket.set_timeout(Some(Duration::from_secs(60)));
+
+    info!("MQTT ingress: conectando ao broker...");
+    if socket.connect((GATEWAY_CONFIG.broker_ip, GATEWAY_CONFIG.broker_port)).await.is_err() {
+        error!("MQTT ingress: falha no TCP connect");
+        return;
+    }
+
+    let mut client = match MqttController::new(socket, GATEWAY_CONFIG.main_topic, GATEWAY_CONFIG.client_id, GATEWAY_CONFIG.main_topic).await {
+        Ok(c) => c,
+        Err(e) => {
+            error!("MQTT ingress: falha ao conectar ao broker: {:?}", e);
+            return;
+        }
+    };
+
+    info!("MQTT ingress: conectado e pronto");
 
     loop {
         let mut mqtt_controller = mqtt_controller_mutex.lock().await;
@@ -262,7 +272,7 @@ async fn task_mqtt_ingress(
                 let now = Instant::now();
                 let timestamp_ms = now.as_millis().min(u32::MAX as u64) as u32;
 
-                let envelope = LoraEnvelope::new(MessageType::Open, seq, request_id, timestamp_ms, 0, payload_copy.clone().to_vec());
+                let envelope = LoraEnvelope::new(MessageType::Open, *seq, *request_id, timestamp_ms, 0, payload_copy.clone().to_vec());
                 sender.send(envelope).await;
 
                 info!(
@@ -290,7 +300,7 @@ async fn task_mqtt_ingress(
     stack: &'static Stack<'static>,
     sender: Sender<'static, CriticalSectionRawMutex, LoraEnvelope, 8>,
 ) {
-    let mut request_id: u16 = 0;
+    let mut request_id: u32 = 0;
     let mut seq: u16 = 1;
     static RX_BUF: StaticCell<[u8; 4096]> = StaticCell::new();
     static TX_BUF: StaticCell<[u8; 4096]> = StaticCell::new();
