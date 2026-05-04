@@ -17,11 +17,12 @@ impl LoraController {
     pub async fn send_message(&mut self, 
         msg_type: message_type::MessageType,
         sequence: u16,
+        request_id: u32,
         timestamp_ms: u32,
         elapsed_ms: u32,
         payload: &[u8]
     ) -> Result<(), RadioError> {
-        let frame = LoraParser::encode_envelope::<PAYLOAD_LENGTH>(msg_type, sequence, timestamp_ms, elapsed_ms, payload.to_vec());
+        let frame = LoraParser::encode_envelope::<PAYLOAD_LENGTH>(msg_type, sequence, request_id, timestamp_ms, elapsed_ms, payload.to_vec());
 
         match frame {
             Some(mut outgoing) => {
@@ -65,9 +66,10 @@ impl LoraController {
                         match LoraParser::decode_payload_utf8(&decoded) {
                             Ok(text) => {
                                 info!(
-                                    "Received CBOR message: v={}, type={:?}, seq={}, ts={}, et{},payload='{}'",
+                                    "Received CBOR message: v={}, type={:?}, req_id={}, seq={}, ts={}, et={}, payload='{}'",
                                     decoded.version,
                                     decoded.msg_type,
+                                    decoded.request_id,
                                     decoded.seq,
                                     decoded.timestamp_ms,
                                     decoded.elapsed_ms,
@@ -78,9 +80,10 @@ impl LoraController {
                             },
                             Err(_) => {
                                 info!(
-                                    "Received CBOR message: v={}, type={:?}, seq={}, ts={}, et{},payload='{:?}'",
+                                    "Received CBOR message: v={}, type={:?}, req_id={}, seq={}, ts={}, et={}, payload='{:?}'",
                                     decoded.version,
                                     decoded.msg_type,
+                                    decoded.request_id,
                                     decoded.seq,
                                     decoded.timestamp_ms,
                                     decoded.elapsed_ms,

@@ -11,11 +11,11 @@ pub const PROTOCOL_VERSION: u8 = 1;
 ///
 /// Cálculo (pior caso):
 /// - 2 bytes reservados para o prefixo de tamanho do CBOR
-/// - ~24 bytes de overhead do envelope (mapa, chaves e campos escalares)
+/// - ~28 bytes de overhead do envelope (mapa, chaves e campos escalares, incluindo request_id)
 /// - restante para os dados do payload
 ///
-/// 255 (PAYLOAD_LENGTH) - 2 (prefixo) - 24 (overhead) = 229 bytes úteis.
-pub const MAX_APP_PAYLOAD: usize = 229;
+/// 255 (PAYLOAD_LENGTH) - 2 (prefixo) - 28 (overhead) = 225 bytes úteis.
+pub const MAX_APP_PAYLOAD: usize = 225;
 
 #[derive(Debug, Encode, Decode)]
 pub struct LoraEnvelope {
@@ -26,10 +26,12 @@ pub struct LoraEnvelope {
     #[n(2)]
     pub seq: u16,
     #[n(3)]
-    pub timestamp_ms: u32,    
+    pub request_id: u32,
     #[n(4)]
-    pub elapsed_ms: u32,
+    pub timestamp_ms: u32,    
     #[n(5)]
+    pub elapsed_ms: u32,
+    #[n(6)]
     pub payload: ByteVec,
 }
 
@@ -38,6 +40,7 @@ impl LoraEnvelope {
     pub fn new(
         msg_type: MessageType,
         seq: u16,
+        request_id: u32,
         timestamp_ms: u32,
         elapsed_ms: u32,
         payload:  impl Into<ByteVec>,
@@ -45,9 +48,10 @@ impl LoraEnvelope {
         LoraEnvelope {
             version: PROTOCOL_VERSION,
             msg_type,
+            seq,
+            request_id,
             timestamp_ms,
             elapsed_ms,
-            seq,
             payload: payload.into(),
         }
     }
@@ -56,6 +60,7 @@ impl LoraEnvelope {
         version: u8,
         msg_type: MessageType,
         seq: u16,
+        request_id: u32,
         timestamp_ms: u32,
         elapsed_ms: u32,
         payload: impl Into<ByteVec>,
@@ -63,9 +68,10 @@ impl LoraEnvelope {
         LoraEnvelope {
             version,
             msg_type,
+            seq,
+            request_id,
             timestamp_ms,
             elapsed_ms,
-            seq,
             payload: payload.into(),
         }
     }
@@ -141,6 +147,7 @@ impl LoraParser {
     pub fn encode_envelope<const N: usize>(
         msg_type: MessageType,
         seq: u16,
+        request_id: u32,
         timestamp_ms: u32,
         elapsed_ms: u32,
         payload: impl Into<ByteVec>,
@@ -148,6 +155,7 @@ impl LoraParser {
         let envelope = LoraEnvelope::new(
             msg_type,
             seq,
+            request_id,
             timestamp_ms,
             elapsed_ms,
             payload.into(),
