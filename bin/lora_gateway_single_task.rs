@@ -233,15 +233,7 @@ async fn task_lora_gateway(
 #[allow(static_mut_refs)]
 async fn task_mqtt_ingress(
     stack: &'static Stack<'static>,
-<<<<<<< HEAD
     sender: Sender<'static, CriticalSectionRawMutex, LoraEnvelope, 8>,
-=======
-    sender: &Sender<'a, CriticalSectionRawMutex, LoraEnvelope, 8>,
-    request_id: &mut u32,
-    seq: &mut u16,
-    rx_buf: &'a mut [u8],
-    tx_buf: &'a mut [u8],
->>>>>>> da1181b (feat: Enhance LoRa message handling with request_id support and deduplication logic)
 ) {
     let mut request_id: u32 = 0;
     let mut seq: u16 = 1;
@@ -307,11 +299,7 @@ async fn task_mqtt_ingress(
                 let now = Instant::now();
                 let timestamp_ms = now.as_millis().min(u32::MAX as u64) as u32;
 
-<<<<<<< HEAD
                 let envelope = LoraEnvelope::new(MessageType::Open, seq, request_id, timestamp_ms, 0, payload_copy.clone().to_vec());
-=======
-                let envelope = LoraEnvelope::new(MessageType::Open, *seq, *request_id, timestamp_ms, 0, payload_copy.clone().to_vec());
->>>>>>> da1181b (feat: Enhance LoRa message handling with request_id support and deduplication logic)
                 sender.send(envelope).await;
 
                 info!(
@@ -331,31 +319,6 @@ async fn task_mqtt_ingress(
         }
 
         Timer::after_millis(100).await;
-    }
-}
-
-#[embassy_executor::task]
-#[allow(static_mut_refs)]
-async fn task_mqtt_ingress(
-    stack: &'static Stack<'static>,
-    sender: Sender<'static, CriticalSectionRawMutex, LoraEnvelope, 8>,
-) {
-    let mut request_id: u32 = 0;
-    let mut seq: u16 = 1;
-    static RX_BUF: StaticCell<[u8; 4096]> = StaticCell::new();
-    static TX_BUF: StaticCell<[u8; 4096]> = StaticCell::new();
-    let rx_buf = RX_BUF.init([0u8; 4096]);
-    let tx_buf = TX_BUF.init([0u8; 4096]);
-
-    loop {
-        if !wifi_is_connected() || !has_ip(stack) {
-            Timer::after(Duration::from_secs(2)).await;
-            continue;
-        }
-
-        mqtt_ingress_session(stack, &sender, &mut request_id, &mut seq, rx_buf, tx_buf).await;
-
-        Timer::after(Duration::from_secs(5)).await;
     }
 }
 
