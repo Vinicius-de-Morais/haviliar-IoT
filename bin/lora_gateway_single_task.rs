@@ -19,6 +19,8 @@ use esp_println::logger::init_logger;
 use haviliar_iot::{
     controller::{lora::LoraController, mqtt::MqttController}, factory::lora_factory::LoraFactory, hal::{
         lora::PAYLOAD_LENGTH, peripheral_manager::PeripheralManagerStatic, servo_motor::ServoMotor, wifi::Wifi
+    }, protocol::{lora::LoraEnvelope, message_type::MessageType}
+        lora::PAYLOAD_LENGTH, peripheral_manager::PeripheralManagerStatic, servo_motor::ServoMotor, wifi::Wifi
     },     protocol::{lora::LoraEnvelope, message_type::MessageType}
 };
 use log::*;
