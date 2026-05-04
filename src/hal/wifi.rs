@@ -22,7 +22,7 @@ pub struct Wifi {
 
 static WIFI_CONTROLLER: StaticCell<EspWifiController<'static>> = StaticCell::new();
 //static TIMER_GROUP_CELL: StaticCell<TimerGroup<TIMG0>> = StaticCell::new();
-static STACK_RESOURCE_CELL: StaticCell<StackResources<3>> = StaticCell::new();
+static STACK_RESOURCE_CELL: StaticCell<StackResources<8>> = StaticCell::new();
 
 fn log_heap_info(context: &str) {
     let free = esp_alloc::HEAP.free();
@@ -68,7 +68,7 @@ impl Wifi {
         let embassy_net_config = EmbassyNetConfig::dhcpv4(Default::default());
         
         info!("Creating network stack...");
-        let stack_resources  = StackResources::<3>::new();
+        let stack_resources  = StackResources::<8>::new();
         let stack_resources = STACK_RESOURCE_CELL.init(stack_resources);
 
         let (stack, runner) = embassy_net::new(

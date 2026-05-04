@@ -4,6 +4,7 @@
 
 use core::fmt::Write;
 use core::mem::MaybeUninit;
+use core::ptr::addr_of_mut;
 
 use embassy_executor::Spawner;
 use embassy_net::{Runner, Stack, tcp::TcpSocket};
@@ -162,7 +163,8 @@ async fn task_lora_gateway(
                                 let result = LoraEnvelope::new(MessageType::Reply, pending.seq, pending.request_id, envelope.timestamp_ms, 0, b"LoRa forward ACK received".as_slice().to_vec());
                                 lora.send_message_envelope(&result).await.ok();
                                 result_tx.send(result).await;
-                                pending_forward = None;
+                                
+                                pending_forward = Some(LoraEnvelope::new(MessageType::Reply, pending.seq, pending.request_id, envelope.timestamp_ms, 0, b"LoRa forward ACK received".as_slice().to_vec()));
                             } else {
                                 warn!("ACK recebido com seq {} mas pending_forward tem seq {}", envelope.seq, pending.seq);
                             }
@@ -184,6 +186,10 @@ async fn task_lora_gateway(
                         }
                     }
                     MessageType::Reply => {
+                        let result = LoraEnvelope::new(MessageType::Reply, envelope.seq, envelope.request_id, envelope.timestamp_ms, 0, b"LoRa forward Reply received".as_slice().to_vec());
+                                lora.send_message_envelope(&result).await.ok();
+                                result_tx.send(result).await;
+
                         pending_forward = None;
                     }
                     _ => {}
@@ -223,36 +229,67 @@ async fn task_lora_gateway(
     }
 }
 
-async fn mqtt_ingress_session<'a>(
+#[embassy_executor::task]
+#[allow(static_mut_refs)]
+async fn task_mqtt_ingress(
     stack: &'static Stack<'static>,
-    sender: &Sender<'a, CriticalSectionRawMutex, LoraEnvelope, 8>,
-    request_id: &mut u32,
-    seq: &mut u16,
-    rx_buf: &'a mut [u8],
-    tx_buf: &'a mut [u8],
+    sender: Sender<'static, CriticalSectionRawMutex, LoraEnvelope, 8>,
 ) {
-    let mut socket = TcpSocket::new(*stack, rx_buf, tx_buf);
-    socket.set_timeout(Some(Duration::from_secs(60)));
-
-    info!("MQTT ingress: conectando ao broker...");
-    if socket.connect((GATEWAY_CONFIG.broker_ip, GATEWAY_CONFIG.broker_port)).await.is_err() {
-        error!("MQTT ingress: falha no TCP connect");
-        return;
-    }
-
-    let mut client = match MqttController::new(socket, GATEWAY_CONFIG.main_topic, GATEWAY_CONFIG.client_id, GATEWAY_CONFIG.main_topic).await {
-        Ok(c) => c,
-        Err(e) => {
-            error!("MQTT ingress: falha ao conectar ao broker: {:?}", e);
-            return;
-        }
-    };
-
-    info!("MQTT ingress: conectado e pronto");
+    let mut request_id: u32 = 0;
+    let mut seq: u16 = 1;
+    static mut RX_BUF: [u8; 4096] = [0u8; 4096];
+    static mut TX_BUF: [u8; 4096] = [0u8; 4096];
+    static mut MQTT_CLIENT_RX: [u8; 1024] = [0u8; 1024];
+    static mut MQTT_CLIENT_TX: [u8; 1024] = [0u8; 1024];
+    let mut client: Option<MqttController<'static>> = None;
 
     loop {
-        match client.receive_message().await {
-            Ok((_topic, payload)) => {
+        if !wifi_is_connected() || !has_ip(stack) {
+            Timer::after(Duration::from_secs(2)).await;
+            continue;
+        }
+
+        if client.is_none() {
+            info!("MQTT ingress: conectando ao broker...");
+            let rx_buf = unsafe { &mut RX_BUF };
+            let tx_buf = unsafe { &mut TX_BUF };
+            let mut socket = TcpSocket::new(*stack, rx_buf, tx_buf);
+            socket.set_timeout(Some(Duration::from_secs(60)));
+            if socket
+                .connect((GATEWAY_CONFIG.broker_ip, GATEWAY_CONFIG.broker_port))
+                .await
+                .is_err()
+            {
+                error!("MQTT ingress: falha no TCP connect");
+                Timer::after(Duration::from_secs(5)).await;
+                continue;
+            }
+            let mqtt_rx = unsafe { &mut MQTT_CLIENT_RX };
+            let mqtt_tx = unsafe { &mut MQTT_CLIENT_TX };
+            match MqttController::new(
+                socket,
+                mqtt_rx,
+                mqtt_tx,
+                GATEWAY_CONFIG.main_topic,
+                GATEWAY_CONFIG.client_id,
+                GATEWAY_CONFIG.main_topic,
+            )
+            .await
+            {
+                Ok(c) => {
+                    info!("MQTT ingress: conectado e pronto");
+                    client = Some(c);
+                }
+                Err(e) => {
+                    error!("MQTT ingress: falha ao conectar ao broker: {:?}", e);
+                    Timer::after(Duration::from_secs(5)).await;
+                    continue;
+                }
+            }
+        }
+
+        match client.as_mut().unwrap().receive_message().await {
+            Ok(Some((_topic, payload))) => {
                 let mut payload_copy = heapless::Vec::<u8, PAYLOAD_LENGTH>::new();
                 if payload_copy.extend_from_slice(payload).is_err() {
                     error!("Payload MQTT maior que o limite LoRa ({} bytes)", PAYLOAD_LENGTH);
@@ -262,7 +299,7 @@ async fn mqtt_ingress_session<'a>(
                 let now = Instant::now();
                 let timestamp_ms = now.as_millis().min(u32::MAX as u64) as u32;
 
-                let envelope = LoraEnvelope::new(MessageType::Open, *seq, *request_id, timestamp_ms, 0, payload_copy.clone().to_vec());
+                let envelope = LoraEnvelope::new(MessageType::Open, seq, request_id, timestamp_ms, 0, payload_copy.clone().to_vec());
                 sender.send(envelope).await;
 
                 info!(
@@ -270,12 +307,14 @@ async fn mqtt_ingress_session<'a>(
                     request_id, seq, payload_copy.len()
                 );
 
-                *request_id = request_id.wrapping_add(1);
-                *seq = seq.wrapping_add(1);
+                request_id = request_id.wrapping_add(1);
+                seq = seq.wrapping_add(1);
             }
-            Err(_) => {
-                warn!("MQTT ingress: conexao perdida, reconectando...");
-                break;
+            Ok(None) => {}
+            Err(e) => {
+                warn!("MQTT ingress: conexao perdida, reconectando... {:?}", e);
+                client = None;
+                Timer::after(Duration::from_secs(2)).await;
             }
         }
 
@@ -284,38 +323,16 @@ async fn mqtt_ingress_session<'a>(
 }
 
 #[embassy_executor::task]
-async fn task_mqtt_ingress(
-    stack: &'static Stack<'static>,
-    sender: Sender<'static, CriticalSectionRawMutex, LoraEnvelope, 8>,
-) {
-    let mut request_id: u32 = 0;
-    let mut seq: u16 = 1;
-    static RX_BUF: StaticCell<[u8; 4096]> = StaticCell::new();
-    static TX_BUF: StaticCell<[u8; 4096]> = StaticCell::new();
-    let rx_buf = RX_BUF.init([0u8; 4096]);
-    let tx_buf = TX_BUF.init([0u8; 4096]);
-
-    loop {
-        if !wifi_is_connected() || !has_ip(stack) {
-            Timer::after(Duration::from_secs(2)).await;
-            continue;
-        }
-
-        mqtt_ingress_session(stack, &sender, &mut request_id, &mut seq, rx_buf, tx_buf).await;
-
-        Timer::after(Duration::from_secs(5)).await;
-    }
-}
-
-#[embassy_executor::task]
+#[allow(static_mut_refs)]
 async fn task_mqtt_egress(
     stack: &'static Stack<'static>,
     receiver: Receiver<'static, CriticalSectionRawMutex, LoraEnvelope, 8>,
 ) {
-    static EGRESS_RX_BUF: StaticCell<[u8; 4096]> = StaticCell::new();
-    static EGRESS_TX_BUF: StaticCell<[u8; 4096]> = StaticCell::new();
-    let rx_buf = EGRESS_RX_BUF.init([0u8; 4096]);
-    let tx_buf = EGRESS_TX_BUF.init([0u8; 4096]);
+    static mut EGRESS_RX_BUF: [u8; 4096] = [0u8; 4096];
+    static mut EGRESS_TX_BUF: [u8; 4096] = [0u8; 4096];
+    static mut MQTT_CLIENT_RX_EGRESS: [u8; 1024] = [0u8; 1024];
+    static mut MQTT_CLIENT_TX_EGRESS: [u8; 1024] = [0u8; 1024];
+    let mut client: Option<MqttController<'static>> = None;
 
     loop {
         let result = receiver.receive().await;
@@ -325,29 +342,59 @@ async fn task_mqtt_egress(
             continue;
         }
 
-        let mut socket = TcpSocket::new(*stack, rx_buf, tx_buf);
-        socket.set_timeout(Some(Duration::from_secs(60)));
-
-        info!("MQTT egress: conectando ao broker...");
-        if socket.connect((GATEWAY_CONFIG.broker_ip, GATEWAY_CONFIG.broker_port)).await.is_err() {
-            error!("MQTT egress: falha no TCP connect");
-            Timer::after(Duration::from_secs(5)).await;
-            continue;
-        }
-
-        match MqttController::new(socket, GATEWAY_CONFIG.main_topic, GATEWAY_CONFIG.client_id, GATEWAY_CONFIG.main_topic).await {
-            Ok(mut client) => {
-                let mut payload = heapless::String::<128>::new();
-                payload.clear();
-                write!(payload, "ACK seq={}", result.seq).ok();
-
-                match client.publish_message(GATEWAY_CONFIG.status_subtopic, payload.as_bytes()).await {
-                    Ok(()) => info!("MQTT egress: status publicado"),
-                    Err(e) => error!("MQTT egress: falha ao publicar: {:?}", e),
+        if client.is_none() {
+            info!("MQTT egress: conectando ao broker...");
+            let rx_buf = unsafe { &mut EGRESS_RX_BUF };
+            let tx_buf = unsafe { &mut EGRESS_TX_BUF };
+            let mut socket = TcpSocket::new(*stack, rx_buf, tx_buf);
+            socket.set_timeout(Some(Duration::from_secs(60)));
+            if socket
+                .connect((GATEWAY_CONFIG.broker_ip, GATEWAY_CONFIG.broker_port))
+                .await
+                .is_err()
+            {
+                error!("MQTT egress: falha no TCP connect");
+                Timer::after(Duration::from_secs(5)).await;
+                continue;
+            }
+            let mqtt_rx = unsafe { &mut MQTT_CLIENT_RX_EGRESS };
+            let mqtt_tx = unsafe { &mut MQTT_CLIENT_TX_EGRESS };
+            match MqttController::new(
+                socket,
+                mqtt_rx,
+                mqtt_tx,
+                GATEWAY_CONFIG.main_topic,
+                GATEWAY_CONFIG.client_id,
+                GATEWAY_CONFIG.main_topic,
+            )
+            .await
+            {
+                Ok(c) => {
+                    client = Some(c);
+                }
+                Err(e) => {
+                    error!("MQTT egress: falha ao conectar ao broker: {:?}", e);
+                    Timer::after(Duration::from_secs(5)).await;
+                    continue;
                 }
             }
+        }
+
+        let mut payload = heapless::String::<128>::new();
+        payload.clear();
+        write!(payload, "ACK seq={}", result.seq).ok();
+
+        match client
+            .as_mut()
+            .unwrap()
+            .publish_message(GATEWAY_CONFIG.status_subtopic, payload.as_bytes())
+            .await
+        {
+            Ok(()) => info!("MQTT egress: status publicado"),
             Err(e) => {
-                error!("MQTT egress: falha ao conectar ao broker: {:?}", e);
+                error!("MQTT egress: falha ao publicar: {:?}", e);
+                client = None;
+                Timer::after(Duration::from_secs(2)).await;
             }
         }
     }
@@ -357,7 +404,7 @@ async fn task_mqtt_egress(
 async fn main(spawner: Spawner) {
     unsafe {
         esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
-            HEAP.as_mut_ptr() as *mut u8,
+            addr_of_mut!(HEAP) as *mut u8,
             HEAP_SIZE,
             esp_alloc::MemoryCapability::Internal.into(),
         ));

@@ -113,7 +113,7 @@ async fn watch_mqtt_messages(mqtt_controller_mutex: &'static Mutex<CriticalSecti
 
         let mut mqtt_controller = mqtt_controller_mutex.lock().await;
         match mqtt_controller.receive_message().await {
-                Ok((topic, payload)) => {
+            Ok(Some((topic, payload))) => {
                     let msg = core::str::from_utf8(&payload).unwrap_or("<invalid utf8>");
                     info!("Received message on topic '{}': {}", topic, msg);
 
@@ -129,6 +129,9 @@ async fn watch_mqtt_messages(mqtt_controller_mutex: &'static Mutex<CriticalSecti
                     } else {
                         info!("Payload não é um inteiro válido para ângulo: '{}'", msg);
                     }
+                }
+                Ok(None) => {
+                    continue;
                 }
                 Err(mqtt_error) => {
                     error!("Receive message error: {:?}", mqtt_error);
@@ -257,7 +260,12 @@ async fn main(_spawner: Spawner) {
         break;
     }
 
-    let mqtt_controller = match MqttController::new(socket, "esp32/open", "esp32-haviliar", "esp32/open").await {
+    static MQTT_CLIENT_RX: StaticCell<[u8; 256]> = StaticCell::new();
+    static MQTT_CLIENT_TX: StaticCell<[u8; 256]> = StaticCell::new();
+    let mqtt_rx = MQTT_CLIENT_RX.init([0u8; 256]);
+    let mqtt_tx = MQTT_CLIENT_TX.init([0u8; 256]);
+
+    let mqtt_controller = match MqttController::new(socket, mqtt_rx, mqtt_tx, "esp32/open", "esp32-haviliar", "esp32/open").await {
         Ok(controller) => controller,
         Err(e) => {
             error!("Failed to create MQTT controller: {:?}", e);
