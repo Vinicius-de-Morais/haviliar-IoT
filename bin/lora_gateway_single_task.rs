@@ -324,6 +324,31 @@ async fn task_mqtt_ingress(
 
 #[embassy_executor::task]
 #[allow(static_mut_refs)]
+async fn task_mqtt_ingress(
+    stack: &'static Stack<'static>,
+    sender: Sender<'static, CriticalSectionRawMutex, LoraEnvelope, 8>,
+) {
+    let mut request_id: u16 = 0;
+    let mut seq: u16 = 1;
+    static RX_BUF: StaticCell<[u8; 4096]> = StaticCell::new();
+    static TX_BUF: StaticCell<[u8; 4096]> = StaticCell::new();
+    let rx_buf = RX_BUF.init([0u8; 4096]);
+    let tx_buf = TX_BUF.init([0u8; 4096]);
+
+    loop {
+        if !wifi_is_connected() || !has_ip(stack) {
+            Timer::after(Duration::from_secs(2)).await;
+            continue;
+        }
+
+        mqtt_ingress_session(stack, &sender, &mut request_id, &mut seq, rx_buf, tx_buf).await;
+
+        Timer::after(Duration::from_secs(5)).await;
+    }
+}
+
+#[embassy_executor::task]
+#[allow(static_mut_refs)]
 async fn task_mqtt_egress(
     stack: &'static Stack<'static>,
     receiver: Receiver<'static, CriticalSectionRawMutex, LoraEnvelope, 8>,
