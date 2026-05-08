@@ -180,6 +180,11 @@ async fn task_lora_gateway(
                         } else {
                             seen_seqs.insert(envelope.request_id);
                             servo_motor.open().ok();
+
+                            Timer::after(Duration::from_secs(5)).await;
+
+                            servo_motor.close().ok();
+
                             let ack = LoraEnvelope::new(MessageType::Ack, envelope.seq, envelope.request_id, envelope.timestamp_ms, 0, b"ACK".as_slice().to_vec());
                             lora.send_message_envelope(&ack).await.ok();
                             pending_forward = Some(ack);
