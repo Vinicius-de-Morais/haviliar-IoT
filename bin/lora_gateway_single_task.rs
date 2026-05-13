@@ -20,8 +20,6 @@ use haviliar_iot::{
     controller::{lora::LoraController, mqtt::MqttController}, factory::lora_factory::LoraFactory, hal::{
         lora::PAYLOAD_LENGTH, peripheral_manager::PeripheralManagerStatic, servo_motor::ServoMotor, wifi::Wifi
     }, protocol::{lora::LoraEnvelope, message_type::MessageType}
-        lora::PAYLOAD_LENGTH, peripheral_manager::PeripheralManagerStatic, servo_motor::ServoMotor, wifi::Wifi
-    },     protocol::{lora::LoraEnvelope, message_type::MessageType}
 };
 use log::*;
 use esp_wifi::wifi::{ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState};
