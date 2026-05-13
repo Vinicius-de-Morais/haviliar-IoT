@@ -45,6 +45,16 @@ harness = false # do not use the built in cargo test harness -> resolve rust-ana
 [[bin]]
 name = "teste"
 path = "bin/teste.rs"
+harness = false
+
+[[bin]]
+name = "lora-metrics"
+path = "bin/lora-metrics.rs"
+harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
+
+[[bin]]
+name = "lora-ping-pong"
+path = "bin/lora-ping-pong.rs"
 harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
 
 [profile.release]
