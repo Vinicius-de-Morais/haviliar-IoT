@@ -1,6 +1,6 @@
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use esp_hal::peripherals::{Peripherals, I2C0, SPI2, GPIO17, GPIO9, GPIO10, GPIO11, GPIO8, GPIO12, GPIO21, GPIO18, GPIO36, GPIO47, GPIO13, GPIO14, TIMG0, TIMG1, RNG, WIFI, LEDC, GPIO0};
+use esp_hal::peripherals::{Peripherals, I2C0, SPI2, GPIO17, GPIO9, GPIO10, GPIO11, GPIO8, GPIO12, GPIO21, GPIO18, GPIO36, GPIO47, GPIO13, GPIO14, TIMG0, TIMG1, RNG, WIFI, LEDC, GPIO0, GPIO0};
 use esp_hal::timer::timg::TimerGroup;
 use core::cell::RefCell;
 use core::option::Option;
