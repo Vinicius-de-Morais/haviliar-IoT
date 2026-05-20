@@ -290,27 +290,27 @@ async fn main(_spawner: Spawner) {
             )
         };
 
-        display.text_no_clear("Snd:", 0, 0).ok();
+        display.text_no_clear("Snd:", 0, 12).ok();
         let mut buf = heapless::String::<12>::new();
         write!(&mut buf, "{}", sent).ok();
-        display.text_no_clear(&buf, 40, 0).ok();
-
-        display.text_no_clear("Rcv:", 0, 12).ok();
-        let mut buf = heapless::String::<12>::new();
-        write!(&mut buf, "{}", received).ok();
         display.text_no_clear(&buf, 40, 12).ok();
 
-        display.text_no_clear("Lst:", 0, 24).ok();
+        display.text_no_clear("Rcv:", 0, 24).ok();
         let mut buf = heapless::String::<12>::new();
-        write!(&mut buf, "{}", lost).ok();
+        write!(&mut buf, "{}", received).ok();
         display.text_no_clear(&buf, 40, 24).ok();
 
-        display.text_no_clear("RSSI:", 0, 36).ok();
+        display.text_no_clear("Lst:", 0, 36).ok();
         let mut buf = heapless::String::<12>::new();
-        write!(&mut buf, "{}", last_rssi).ok();
+        write!(&mut buf, "{}", lost).ok();
         display.text_no_clear(&buf, 40, 36).ok();
 
-        display.text_no_clear("PRG:Rst", 0, 48).ok();
+        display.text_no_clear("RSSI:", 0, 48).ok();
+        let mut buf = heapless::String::<12>::new();
+        write!(&mut buf, "{}", last_rssi).ok();
+        display.text_no_clear(&buf, 40, 48).ok();
+
+        display.text_no_clear("PRG:Send", 0, 60).ok();
 
         if let Err(e) = display.flush() {
             error!("Failed to flush display: {:?}", e);
