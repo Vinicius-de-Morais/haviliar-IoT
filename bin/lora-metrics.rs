@@ -177,37 +177,37 @@ async fn task_metrics_report(
 ) {
     let sender = sync_channel.sender();
 
-    loop {
-        Timer::after_millis(METRICS_INTERVAL_MS).await;
+    // loop {
+    //     Timer::after_millis(METRICS_INTERVAL_MS).await;
 
-        let (packets_sent, packets_received, packets_lost, sync_count) = {
-            let metrics_ref = metrics.lock().await;
-            (
-                metrics_ref.packets_sent,
-                metrics_ref.packets_received,
-                metrics_ref.packets_lost,
-                metrics_ref.sync_count,
-            )
-        };
+    //     let (packets_sent, packets_received, packets_lost, sync_count) = {
+    //         let metrics_ref = metrics.lock().await;
+    //         (
+    //             metrics_ref.packets_sent,
+    //             metrics_ref.packets_received,
+    //             metrics_ref.packets_lost,
+    //             metrics_ref.sync_count,
+    //         )
+    //     };
 
-        let now = Instant::now();
-        let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
+    //     let now = Instant::now();
+    //     let timestamp_ms = core::cmp::min(now.as_millis(), u32::MAX as u64) as u32;
 
-        let mut payload = heapless::String::<32>::new();
-        write!(&mut payload, "M|s:{}|r:{}|l:{}|c:{}",
-            packets_sent, packets_received, packets_lost, sync_count).ok();
+    //     let mut payload = heapless::String::<32>::new();
+    //     write!(&mut payload, "M|s:{}|r:{}|l:{}|c:{}",
+    //         packets_sent, packets_received, packets_lost, sync_count).ok();
 
-        let envelope = LoraEnvelope::new(
-            MessageType::Metrics,
-            0,
-            0,
-            timestamp_ms,
-            0,
-            payload.into_bytes().to_vec(),
-        );
+    //     let envelope = LoraEnvelope::new(
+    //         MessageType::Metrics,
+    //         0,
+    //         0,
+    //         timestamp_ms,
+    //         0,
+    //         payload.into_bytes().to_vec(),
+    //     );
 
-        let _ = sender.send(envelope).await;
-    }
+    //     let _ = sender.send(envelope).await;
+    // }
 }
 
 #[esp_hal_embassy::main]

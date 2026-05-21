@@ -19,7 +19,7 @@ use esp_println::logger::init_logger;
 use haviliar_iot::{
     controller::{lora::LoraController, mqtt::MqttController}, factory::lora_factory::LoraFactory, hal::{
         lora::PAYLOAD_LENGTH, peripheral_manager::PeripheralManagerStatic, servo_motor::ServoMotor, wifi::Wifi
-    }, protocol::{lora::LoraEnvelope, message_type::MessageType}
+    },     protocol::{lora::LoraEnvelope, message_type::MessageType}
 };
 use log::*;
 use esp_wifi::wifi::{ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState};
@@ -31,6 +31,33 @@ const HEAP_SIZE: usize = 64 * 1024;
 static mut HEAP: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
 
 const LORA_RX_POLL_MS: u64 = 5000;
+const MAX_SEEN_SEQS: usize = 32;
+
+struct SeenSeqs {
+    seqs: [Option<u32>; MAX_SEEN_SEQS],
+    head: usize,
+}
+
+impl SeenSeqs {
+    fn new() -> Self {
+        Self {
+            seqs: [None; MAX_SEEN_SEQS],
+            head: 0,
+        }
+    }
+
+    fn contains(&self, seq: u32) -> bool {
+        self.seqs.iter().any(|&s| s == Some(seq))
+    }
+
+    fn insert(&mut self, seq: u32) {
+        if self.contains(seq) {
+            return;
+        }
+        self.seqs[self.head] = Some(seq);
+        self.head = (self.head + 1) % MAX_SEEN_SEQS;
+    }
+}
 
 struct GatewayConfig {
     broker_ip: embassy_net::Ipv4Address,
@@ -118,6 +145,7 @@ async fn task_lora_gateway(
     let forward_rx = forward_channel.receiver();
     let result_tx = result_channel.sender();
     let mut pending_forward: Option<LoraEnvelope> = None;
+    let mut seen_seqs = SeenSeqs::new();
 
     loop {
         let mut recv_buffer = [0u8; PAYLOAD_LENGTH];
@@ -132,7 +160,7 @@ async fn task_lora_gateway(
                     MessageType::Ack => {
                         if let Some(pending) = &pending_forward {
                             if pending.seq == envelope.seq {
-                                let result = LoraEnvelope::new(MessageType::Reply, pending.seq, envelope.timestamp_ms, 0, b"LoRa forward ACK received".as_slice().to_vec());
+                                let result = LoraEnvelope::new(MessageType::Reply, pending.seq, pending.request_id, envelope.timestamp_ms, 0, b"LoRa forward ACK received".as_slice().to_vec());
                                 lora.send_message_envelope(&result).await.ok();
                                 result_tx.send(result).await;
                                 
@@ -161,10 +189,6 @@ async fn task_lora_gateway(
                             lora.send_message_envelope(&ack).await.ok();
                             pending_forward = Some(ack);
                         }
-                        servo_motor.open().ok();
-                        let ack = LoraEnvelope::new(MessageType::Ack, envelope.seq, envelope.timestamp_ms, 0, b"ACK".as_slice().to_vec());
-                        lora.send_message_envelope(&ack).await.ok();
-                        pending_forward = Some(ack);
                     }
                     MessageType::Reply => {
                         let result = LoraEnvelope::new(MessageType::Reply, envelope.seq, envelope.request_id, envelope.timestamp_ms, 0, b"LoRa forward Reply received".as_slice().to_vec());
@@ -188,8 +212,8 @@ async fn task_lora_gateway(
         match pending_forward {
             Some(ref pending) => {
                 let payload_copy = pending.payload.clone();
-                info!("Reenviando mensagem pendente para LoRa: seq={}, bytes={}", pending.seq, payload_copy.len());
-                lora.send_message(pending.msg_type, pending.seq, pending.timestamp_ms, pending.elapsed_ms, payload_copy.as_slice()).await.ok();
+                info!("Reenviando mensagem pendente para LoRa: seq={}, request_id={}, bytes={}", pending.seq, pending.request_id, payload_copy.len());
+                lora.send_message(pending.msg_type, pending.seq, pending.request_id, pending.timestamp_ms, pending.elapsed_ms, payload_copy.as_slice()).await.ok();
             }
             None => {
                 if let Ok(request) = forward_rx.try_receive() {
@@ -200,7 +224,7 @@ async fn task_lora_gateway(
                         }
                         Err(e) => {
                             error!("Falha ao enviar mensagem LoRa: {:?}", e);
-                            let result = LoraEnvelope::new(MessageType::Reply, request.seq, request.timestamp_ms, 0, b"LoRa send failed".as_slice().to_vec());
+                            let result = LoraEnvelope::new(MessageType::Reply, request.seq, request.request_id, request.timestamp_ms, 0, b"LoRa send failed".as_slice().to_vec());
                             result_tx.send(result).await;
                         }
                     }
@@ -271,34 +295,6 @@ async fn task_mqtt_ingress(
 
         match client.as_mut().unwrap().receive_message().await {
             Ok(Some((_topic, payload))) => {
-    sender: &Sender<'a, CriticalSectionRawMutex, LoraEnvelope, 8>,
-    request_id: &mut u16,
-    seq: &mut u16,
-    rx_buf: &'a mut [u8],
-    tx_buf: &'a mut [u8],
-) {
-    let mut socket = TcpSocket::new(*stack, rx_buf, tx_buf);
-    socket.set_timeout(Some(Duration::from_secs(60)));
-
-    info!("MQTT ingress: conectando ao broker...");
-    if socket.connect((GATEWAY_CONFIG.broker_ip, GATEWAY_CONFIG.broker_port)).await.is_err() {
-        error!("MQTT ingress: falha no TCP connect");
-        return;
-    }
-
-    let mut client = match MqttController::new(socket, GATEWAY_CONFIG.main_topic, GATEWAY_CONFIG.client_id, GATEWAY_CONFIG.main_topic).await {
-        Ok(c) => c,
-        Err(e) => {
-            error!("MQTT ingress: falha ao conectar ao broker: {:?}", e);
-            return;
-        }
-    };
-
-    info!("MQTT ingress: conectado e pronto");
-
-    loop {
-        match client.receive_message().await {
-            Ok((_topic, payload)) => {
                 let mut payload_copy = heapless::Vec::<u8, PAYLOAD_LENGTH>::new();
                 if payload_copy.extend_from_slice(payload).is_err() {
                     error!("Payload MQTT maior que o limite LoRa ({} bytes)", PAYLOAD_LENGTH);
@@ -309,7 +305,6 @@ async fn task_mqtt_ingress(
                 let timestamp_ms = now.as_millis().min(u32::MAX as u64) as u32;
 
                 let envelope = LoraEnvelope::new(MessageType::Open, seq, request_id, timestamp_ms, 0, payload_copy.clone().to_vec());
-                let envelope = LoraEnvelope::new(MessageType::Open, *seq, timestamp_ms, 0, payload_copy.clone().to_vec());
                 sender.send(envelope).await;
 
                 info!(
@@ -334,30 +329,6 @@ async fn task_mqtt_ingress(
 
 #[embassy_executor::task]
 #[allow(static_mut_refs)]
-async fn task_mqtt_ingress(
-    stack: &'static Stack<'static>,
-    sender: Sender<'static, CriticalSectionRawMutex, LoraEnvelope, 8>,
-) {
-    let mut request_id: u16 = 0;
-    let mut seq: u16 = 1;
-    static RX_BUF: StaticCell<[u8; 4096]> = StaticCell::new();
-    static TX_BUF: StaticCell<[u8; 4096]> = StaticCell::new();
-    let rx_buf = RX_BUF.init([0u8; 4096]);
-    let tx_buf = TX_BUF.init([0u8; 4096]);
-
-    loop {
-        if !wifi_is_connected() || !has_ip(stack) {
-            Timer::after(Duration::from_secs(2)).await;
-            continue;
-        }
-
-        mqtt_ingress_session(stack, &sender, &mut request_id, &mut seq, rx_buf, tx_buf).await;
-
-        Timer::after(Duration::from_secs(5)).await;
-    }
-}
-
-#[embassy_executor::task]
 async fn task_mqtt_egress(
     stack: &'static Stack<'static>,
     receiver: Receiver<'static, CriticalSectionRawMutex, LoraEnvelope, 8>,
