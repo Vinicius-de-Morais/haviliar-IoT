@@ -5,6 +5,7 @@
 use core::fmt::Write;
 use core::mem::MaybeUninit;
 use core::ptr::addr_of_mut;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use embassy_executor::Spawner;
 use embassy_net::{Runner, Stack, tcp::TcpSocket};
@@ -17,7 +18,7 @@ use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
 use esp_println::logger::init_logger;
 use haviliar_iot::{
-    controller::{lora::LoraController, mqtt::MqttController}, factory::lora_factory::LoraFactory, hal::{
+    controller::{lora::LoraController, mqtt::MqttController}, factory::{display_factory::DisplayFactory, lora_factory::LoraFactory}, hal::{
         lora::PAYLOAD_LENGTH, peripheral_manager::PeripheralManagerStatic, servo_motor::ServoMotor, wifi::Wifi
     },     protocol::{lora::LoraEnvelope, message_type::MessageType}
 };
@@ -81,6 +82,7 @@ type LoraToMqttChannel = Channel<CriticalSectionRawMutex, LoraEnvelope, 8>;
 static FORWARD_TO_LORA_CHANNEL: StaticCell<ForwardToLoraChannel> = StaticCell::new();
 static LORA_TO_MQTT_CHANNEL: StaticCell<LoraToMqttChannel> = StaticCell::new();
 static STACK_CELL: StaticCell<Stack<'static>> = StaticCell::new();
+static LORA_SENDING: AtomicBool = AtomicBool::new(false);
 
 fn wifi_is_connected() -> bool {
     matches!(esp_wifi::wifi::wifi_state(), WifiState::StaConnected)
@@ -148,6 +150,8 @@ async fn task_lora_gateway(
     let mut seen_seqs = SeenSeqs::new();
 
     loop {
+        LORA_SENDING.store(false, Ordering::Relaxed);
+
         let mut recv_buffer = [0u8; PAYLOAD_LENGTH];
         let rx_result = lora
             .receive_message(&mut recv_buffer)
@@ -161,7 +165,9 @@ async fn task_lora_gateway(
                         if let Some(pending) = &pending_forward {
                             if pending.seq == envelope.seq {
                                 let result = LoraEnvelope::new(MessageType::Reply, pending.seq, pending.request_id, envelope.timestamp_ms, 0, b"LoRa forward ACK received".as_slice().to_vec());
+                                LORA_SENDING.store(true, Ordering::Relaxed);
                                 lora.send_message_envelope(&result).await.ok();
+                                LORA_SENDING.store(false, Ordering::Relaxed);
                                 result_tx.send(result).await;
                                 
                                 pending_forward = Some(LoraEnvelope::new(MessageType::Reply, pending.seq, pending.request_id, envelope.timestamp_ms, 0, b"LoRa forward ACK received".as_slice().to_vec()));
@@ -176,7 +182,9 @@ async fn task_lora_gateway(
                         if seen_seqs.contains(envelope.request_id) {
                             warn!("LoRa duplicata rejeitada: request_id={}", envelope.request_id);
                             let ack = LoraEnvelope::new(MessageType::Ack, envelope.seq, envelope.request_id, envelope.timestamp_ms, 0, b"DUP_ACK".as_slice().to_vec());
+                            LORA_SENDING.store(true, Ordering::Relaxed);
                             lora.send_message_envelope(&ack).await.ok();
+                            LORA_SENDING.store(false, Ordering::Relaxed);
                         } else {
                             seen_seqs.insert(envelope.request_id);
                             servo_motor.open().ok();
@@ -186,13 +194,17 @@ async fn task_lora_gateway(
                             servo_motor.close().ok();
 
                             let ack = LoraEnvelope::new(MessageType::Ack, envelope.seq, envelope.request_id, envelope.timestamp_ms, 0, b"ACK".as_slice().to_vec());
+                            LORA_SENDING.store(true, Ordering::Relaxed);
                             lora.send_message_envelope(&ack).await.ok();
+                            LORA_SENDING.store(false, Ordering::Relaxed);
                             pending_forward = Some(ack);
                         }
                     }
                     MessageType::Reply => {
                         let result = LoraEnvelope::new(MessageType::Reply, envelope.seq, envelope.request_id, envelope.timestamp_ms, 0, b"LoRa forward Reply received".as_slice().to_vec());
+                                LORA_SENDING.store(true, Ordering::Relaxed);
                                 lora.send_message_envelope(&result).await.ok();
+                                LORA_SENDING.store(false, Ordering::Relaxed);
                                 result_tx.send(result).await;
 
                         pending_forward = None;
@@ -213,10 +225,13 @@ async fn task_lora_gateway(
             Some(ref pending) => {
                 let payload_copy = pending.payload.clone();
                 info!("Reenviando mensagem pendente para LoRa: seq={}, request_id={}, bytes={}", pending.seq, pending.request_id, payload_copy.len());
+                LORA_SENDING.store(true, Ordering::Relaxed);
                 lora.send_message(pending.msg_type, pending.seq, pending.request_id, pending.timestamp_ms, pending.elapsed_ms, payload_copy.as_slice()).await.ok();
+                LORA_SENDING.store(false, Ordering::Relaxed);
             }
             None => {
                 if let Ok(request) = forward_rx.try_receive() {
+                    LORA_SENDING.store(true, Ordering::Relaxed);
                     match lora.send_message_envelope(&request).await {
                         Ok(()) => {
                             info!("LoRa forward enviado: seq={}, bytes={}", request.seq, request.payload.len());
@@ -228,6 +243,7 @@ async fn task_lora_gateway(
                             result_tx.send(result).await;
                         }
                     }
+                    LORA_SENDING.store(false, Ordering::Relaxed);
                 }
             }
         }
@@ -454,9 +470,41 @@ async fn main(spawner: Spawner) {
     let _ = spawner.spawn(task_mqtt_ingress(stack, forward_channel.sender()));
     let _ = spawner.spawn(task_mqtt_egress(stack, result_channel.receiver()));
 
+    let display_peripherals = peripheral_manager.take_display_peripherals().unwrap();
+    let mut display = match DisplayFactory::create_from_peripherals(display_peripherals) {
+        Ok(display) => display,
+        Err(e) => {
+            error!("Failed to create display: {}", e);
+            panic!("Display initialization failed");
+        }
+    };
+
     info!("Gateway iniciado - LoRa ativo, WiFi/MQTT geridos independentemente");
 
     loop {
-        Timer::after_secs(60).await;
+        let wifi_status = if wifi_is_connected() { "on" } else { "off" };
+        let lora_status = if LORA_SENDING.load(Ordering::Relaxed) { "Sending" } else { "Listening" };
+
+        if let Err(e) = display.clear() {
+            error!("Failed to clear display: {:?}", e);
+        }
+
+        display.text_new_line("MQTT + LoRa", 1).ok();
+        display.text_new_line("Stacenter", 2).ok();
+        display.text_new_line("", 3).ok();
+
+        let mut wifi_line = heapless::String::<32>::new();
+        write!(wifi_line, "WiFi: {}", wifi_status).ok();
+        display.text_new_line(&wifi_line, 4).ok();
+
+        let mut lora_line = heapless::String::<32>::new();
+        write!(lora_line, "LoRa: {}", lora_status).ok();
+        display.text_new_line(&lora_line, 5).ok();
+
+        if let Err(e) = display.flush() {
+            error!("Failed to flush display: {:?}", e);
+        }
+
+        Timer::after_secs(1).await;
     }
 }
